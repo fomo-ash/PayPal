@@ -46,7 +46,7 @@ Verdict is the neutral middleman, automated and fair to **both** sides.
 | 4. Claim | The worker (signed in with PayPal) sees the description, examples, group weights and suite hash, then accepts. Deadline is 48h or less. | Log in with PayPal |
 | 5. Submit | One graded submission. Unlimited runs against the public examples. | none |
 | 6. Grade | Code runs in a no-network microVM. The harness feeds **one input at a time**; **expected answers never enter the sandbox**, and comparison happens outside. 200 **fresh random inputs** are checked against the reference solution. | none |
-| 7. Check | A static scanner looks for known cheats. The AI judge (Claude) reviews the evidence and cites exact lines. **The AI can never raise a payment, and cannot block without a deterministic signal.** | none |
+| 7. Check | A static scanner looks for known cheats. The AI judge (an open model on Groq's free tier) reviews the evidence and cites exact lines. **The AI can never raise a payment, and cannot block without a deterministic signal.** | none |
 | 8. Settle | Capture the earned amount (`final_capture=true` releases the rest), or void everything. Pay the worker. | Payments v2 capture/void, **Payouts** |
 | 9. Release | The buyer gets the code **only after the capture completes**. Both sides get a signed receipt. | none |
 | 10. Disputes | If the buyer files a chargeback, the evidence pack is submitted automatically. | **Disputes API**, Webhooks |
@@ -98,7 +98,7 @@ The full threat model is in [`docs/LOOPHOLES.md`](docs/LOOPHOLES.md). In summary
 ## 5. Architecture
 
 ```
-   Buyer (human)          Worker (human)        Worker agent (Claude / any LLM)
+   Buyer (human)          Worker (human)        Worker agent (any LLM)        
         │ Next.js web + PayPal JS SDK │                 │ MCP server / REST
         ▼                             ▼                 ▼
  ┌─────────────────────────── API (FastAPI) ───────────────────────────────┐
@@ -118,7 +118,7 @@ The full threat model is in [`docs/LOOPHOLES.md`](docs/LOOPHOLES.md). In summary
                │ 2 grader ───────────────────┼──► SANDBOX (E2B microVM)
                │ 3 fresh-input generator     │    no network · resource caps
                │ 4 static scanner            │    harness gets ONE input at a
-               │ 5 AI judge (Claude)         │    time, never sees the expected
+               │ 5 AI judge (LLM via Groq)   │    time, never sees the expected
                │ 6 money worker (outbox)     │    answers
                └─────────────────────────────┘
 ```
@@ -144,8 +144,8 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · state machine: [`docs
 | Storage | Cloudflare R2 (S3 API) |
 | Sandbox | E2B microVMs (Firecracker); fallback Docker + gVisor |
 | Checks | Hypothesis, Python `ast`, Semgrep custom rules |
-| AI | Claude Sonnet 5.5 (`claude-sonnet-5-5`) for the judge and the description check, Claude Haiku 5.5 (`claude-haiku-5-5`) for drafting generators |
-| Agents | MCP Python SDK (FastMCP), Claude Agent SDK (demo worker) |
+| AI | Free tiers through one OpenAI-compatible client (`verdict/judge/llm.py`): **Groq** `openai/gpt-oss-120b` for the judge and the description check, `llama-3.1-8b-instant` for drafts; **Gemini Flash** (Google AI Studio) as automatic fallback. Any OpenAI-compatible provider can be swapped in via `.env`. See [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md) |
+| Agents | MCP Python SDK (FastMCP), demo worker agent using the same free LLM client |
 | PayPal | Orders v2, Payments v2 (authorize/capture/void/reauthorize), Payouts, Disputes, Webhooks, Log in with PayPal |
 | Receipts | Canonical JSON signed with Ed25519, PDF via WeasyPrint, public `/verify` page |
 | Observability | OpenTelemetry, Sentry, Langfuse |
@@ -192,7 +192,8 @@ paypall/
 - Node 20+ (frontend, Phase 1)
 - Docker (local Postgres/Redis)
 - A PayPal developer account with sandbox app credentials ([`docs/PAYPAL_SANDBOX_SETUP.md`](docs/PAYPAL_SANDBOX_SETUP.md))
-- An Anthropic API key and an E2B API key (Phase 1)
+- A free Groq API key (and optionally a free Gemini key as fallback): [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md)
+- An E2B API key (Phase 1)
 
 ### Setup
 ```bash
@@ -204,6 +205,7 @@ make test                       # unit tests + benchmark (no keys needed)
 make bench                      # grading pipeline on 2 honest + 5 cheating submissions
 python scripts/check_env.py     # confirms which keys are set (never prints them)
 python scripts/sandbox_spike.py # day-1: runs authorize → partial capture → void → payout in the sandbox
+python scripts/llm_smoke.py     # checks the free LLM judge (needs LLM_API_KEY from Groq)
 ```
 
 ### Local services (Phase 1+)
@@ -245,6 +247,7 @@ Day-by-day plan, owners and cut list: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 | [`docs/STATE_MACHINE.md`](docs/STATE_MACHINE.md) | Job states, transitions, timers, outbox |
 | [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) | Postgres tables and the double-entry ledger |
 | [`docs/PAYPAL_SANDBOX_SETUP.md`](docs/PAYPAL_SANDBOX_SETUP.md) | Getting keys, test accounts, webhooks, every PayPal call we make |
+| [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md) | Free LLM providers (Groq + Gemini), limits, keys, smoke test |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | 11-day plan, owners, cut list, day-1 checks |
 | [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | The 3-minute video, scene by scene |
 | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Branching, commits, PRs, code style |

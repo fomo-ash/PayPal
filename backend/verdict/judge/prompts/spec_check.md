@@ -4,6 +4,17 @@ For each test, answer whether the expected output follows from the spec and the 
 alone. A test is NOT implied if it requires behaviour the spec never mentions or contradicts.
 Be strict: the worker never sees these tests.
 
-<spec>{spec}</spec>
-<examples>{examples}</examples>
-<tests>{tests}</tests>
+Reply with ONLY one JSON object, no markdown, in exactly this shape:
+{{"items": [{{"test_id": "core-1", "implied_by_spec": true, "reason": "short reason"}}]}}
+
+<spec>
+{spec}
+</spec>
+
+<examples>
+{examples}
+</examples>
+
+<tests>
+{tests}
+</tests>

@@ -13,7 +13,7 @@ except ImportError:
 GROUPS = {
     "PayPal (needed for Phase 1)": ["PAYPAL_CLIENT_ID", "PAYPAL_SECRET", "SANDBOX_WORKER_EMAIL"],
     "PayPal webhooks / login": ["PAYPAL_WEBHOOK_ID", "PAYPAL_LOGIN_REDIRECT_URI"],
-    "AI judge": ["ANTHROPIC_API_KEY"],
+    "AI judge (Groq primary, Gemini fallback)": ["LLM_API_KEY", "LLM_FALLBACK_API_KEY"],
     "Sandbox runner": ["E2B_API_KEY"],
     "Storage": ["DATABASE_URL", "REDIS_URL", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"],
 }

@@ -32,3 +32,7 @@ class SpecCheckItem(BaseModel):
     test_id: str
     implied_by_spec: bool
     reason: str = Field(max_length=500)
+
+
+class SpecCheck(BaseModel):
+    items: list[SpecCheckItem]

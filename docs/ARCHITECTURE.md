@@ -6,7 +6,7 @@
 |---|---|---|---|
 | **web** (Next.js) | Render (node) | Buyer: post job, upload suite, see the validation report, fund with PayPal Buttons. Worker: browse, accept, run examples, submit. Verdict page. Admin review queue. `/verify` page. | api |
 | **api** (FastAPI) | Render (python) | The ONLY writer of job state. State machine, policy, ledger, webhook receiver, auth. | Postgres, Redis, R2, PayPal (read-only + order creation) |
-| **worker** (Celery) | Render (worker) | Suite validation, grading, fresh inputs, scanning, AI judge, money (outbox). | Postgres, Redis, R2, E2B, Anthropic, PayPal |
+| **worker** (Celery) | Render (worker) | Suite validation, grading, fresh inputs, scanning, AI judge, money (outbox). | Postgres, Redis, R2, E2B, LLM (Groq / Gemini), PayPal |
 | **beat** (Celery Beat) | Render (worker) | Timers: claim deadlines, authorization honor-period checks, outbox sweeper. | Redis |
 | **sandbox** | E2B (Firecracker microVMs) | Runs untrusted code. Gets harness + submission only. No network. | nothing |
 | **Postgres 16** | Render | Jobs, suites, submissions, runs, verdicts, ledger, outbox, audit, PayPal events. | |
@@ -21,7 +21,7 @@ BUYER                    API / WORKER                         PAYPAL            
   │ POST /jobs + suite      │                                    │                       │
   │────────────────────────►│ validate_suite:                    │                       │
   │                         │  reference vs hidden tests ────────┼──────────────────────►│ (ref runs in its own VM)
-  │                         │  AI spec check (Claude)            │                       │
+  │                         │  AI spec check (LLM)               │                       │
   │◄──── report ────────────│  → AWAITING_FUNDS or INVALID       │                       │
   │ PayPal Buttons          │ POST /v2/checkout/orders AUTHORIZE ►│                       │
   │ approve popup ─────────────────────────────────────────────►│                       │
@@ -34,7 +34,7 @@ WORKER                      │                                    │          
   │                         │  compare OUTSIDE ◄─────────────────┼───────────────────────│
   │                         │  fresh inputs (ref = oracle)       │                       │
   │                         │  score (Decimal)                   │                       │
-  │                         │ judge: Claude → AIDecision enum    │                       │
+  │                         │ judge: LLM → AIDecision enum       │                       │
   │                         │ policy.decide → CAPTURE/VOID/REVIEW│                       │
   │                         │ outbox → capture 81.50 final ─────►│ $18.50 released       │
   │                         │ outbox → payout 77.42 ────────────►│ worker paid           │
@@ -52,7 +52,7 @@ Implemented in `backend/verdict/grading/pipeline.py` (Phase 0 runs locally; see 
 4. **Flaky check**: failing tests are re-run with identical inputs. A flip marks the test flaky, and it is excluded from both numerator and denominator.
 5. **Fresh inputs**: `gen_input(rng)` produces N small inputs, the reference solution produces the expected outputs, and the submission's outputs are compared outside. `rate = min(hidden, fresh)` for groups with fresh inputs.
 6. **Score** (`core/scoring.py`): weighted, minimum score, cents rounded down, fee rounded half-up.
-7. **AI judge** (`judge/review.py`, Phase 3): returns an `AIDecision` enum and cited findings.
+7. **AI judge** (`judge/review.py` + `judge/llm.py`): returns an `AIDecision` enum and cited findings. If every LLM provider fails, the result is HUMAN_REVIEW.
 8. **Policy** (`core/policy.py`): hard signal → VOID; zero score → VOID; AI block without a hard signal → HUMAN_REVIEW; otherwise CAPTURE.
 
 ## 4. Security boundaries

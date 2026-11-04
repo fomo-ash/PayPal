@@ -24,7 +24,7 @@ class Finding:
 
 
 INJECTION = re.compile(
-    r"(ai|llm|gpt|claude)\s*(judge|grader|reviewer)|\b(judge|grader)\b.*\b(approve|pass|clear)\b"
+    r"(ai|llm|gpt|claude|gemini|llama|model)\s*(judge|grader|reviewer)|\b(judge|grader)\b.*\b(approve|pass|clear)\b"
     r"|ignore (all |the )?(previous|prior) instructions|approve (the )?(full )?payment"
     r"|mark (this|it) as (clear|pass)",
     re.IGNORECASE,

@@ -12,11 +12,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest ruff
+      - run: pip install pytest ruff pydantic
       - name: Unit tests + bench (pure-logic, no secrets needed)
         run: python -m pytest -q
       - name: Lint
-        run: ruff check backend/verdict/core backend/verdict/grading backend/verdict/scanner
+        run: ruff check backend/verdict/core backend/verdict/grading backend/verdict/scanner backend/verdict/judge
       - name: Guard against committed secrets
         run: |
           if git ls-files | grep -E '(^|/)\.env$'; then echo ".env is committed!"; exit 1; fi

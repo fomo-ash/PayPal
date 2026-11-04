@@ -16,7 +16,8 @@ services:
       - { key: PAYPAL_CLIENT_ID, sync: false }
       - { key: PAYPAL_SECRET, sync: false }
       - { key: PAYPAL_WEBHOOK_ID, sync: false }
-      - { key: ANTHROPIC_API_KEY, sync: false }
+      - { key: LLM_API_KEY, sync: false }
+      - { key: LLM_FALLBACK_API_KEY, sync: false }
       - { key: E2B_API_KEY, sync: false }
       - { key: RECEIPT_SIGNING_KEY_B64, sync: false }
 
@@ -68,5 +69,6 @@ envVarGroups:
       - { key: PAYPAL_ENV, value: sandbox }
       - { key: PAYPAL_CLIENT_ID, sync: false }
       - { key: PAYPAL_SECRET, sync: false }
-      - { key: ANTHROPIC_API_KEY, sync: false }
+      - { key: LLM_API_KEY, sync: false }
+      - { key: LLM_FALLBACK_API_KEY, sync: false }
       - { key: E2B_API_KEY, sync: false }

@@ -23,9 +23,15 @@ class Settings(BaseSettings):
     paypal_cancel_url: str = "http://localhost:3000/fund/cancel"
     paypal_login_redirect_uri: str = "http://localhost:3000/auth/callback"
 
-    anthropic_api_key: str = ""
-    judge_model: str = "claude-sonnet-5-5"
-    draft_model: str = "claude-haiku-5-5"
+    # LLM: any OpenAI-compatible provider. Default: Groq free tier, Gemini free tier as fallback.
+    llm_provider: str = "groq"
+    llm_base_url: str = "https://api.groq.com/openai/v1"
+    llm_api_key: str = ""
+    judge_model: str = "openai/gpt-oss-120b"
+    draft_model: str = "llama-3.1-8b-instant"
+    llm_fallback_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    llm_fallback_api_key: str = ""
+    llm_fallback_model: str = "gemini-flash-latest"
 
     sandbox_backend: str = "e2b"
     e2b_api_key: str = ""

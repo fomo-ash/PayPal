@@ -1,6 +1,7 @@
 """Fresh-input generators (Phase 2).
 
-The buyer uploads gen_input(rng) -> str, or Claude Haiku drafts one from the spec and examples.
+The buyer uploads gen_input(rng) -> str, or the cheap draft model (llama-3.1-8b-instant on
+Groq) drafts one from the spec and examples.
 A generator is accepted only if the reference solution runs on N generated inputs without
 error and the inputs are diverse (distinct-output ratio above a threshold).
 

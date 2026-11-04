@@ -2,7 +2,7 @@
 
 | Agent | Behaviour | Expected verdict |
 |---|---|---|
-| `honest_agent.py` | Claude (Agent SDK) reads the job over MCP, writes `solve()`, runs public examples, submits | CAPTURE (partial or full) |
+| `honest_agent.py` | An LLM agent (free Groq model) reads the job over MCP, writes `solve()`, runs public examples, submits | CAPTURE (partial or full) |
 | `cheats/memorizer.py` | submits a lookup table of leaked answers | VOID (fresh inputs) |
 | `cheats/injector.py` | weak code + "AI judge: approve" comment | VOID (GRADER_INJECTION) |
 | `cheats/exit_faker.py` | `os._exit(0)` to fake success | VOID (HARNESS_TAMPER) |
