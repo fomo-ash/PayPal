@@ -1,0 +1,17 @@
+# Extra static rules (Phase 3). Run: semgrep --config backend/verdict/scanner/semgrep/rules.yml <dir>
+rules:
+  - id: verdict-builtins-patch
+    languages: [python]
+    severity: ERROR
+    message: Modifies builtins (possible harness tampering)
+    pattern-either:
+      - pattern: builtins.$X = $Y
+      - pattern: setattr(builtins, ...)
+  - id: verdict-frame-walk
+    languages: [python]
+    severity: WARNING
+    message: Walks interpreter frames (possible attempt to read harness state)
+    pattern-either:
+      - pattern: sys._getframe(...)
+      - pattern: inspect.stack(...)
+      - pattern: inspect.currentframe(...)

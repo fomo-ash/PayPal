@@ -1,0 +1,57 @@
+[project]
+name = "verdict"
+version = "0.0.1"
+description = "Pay-on-verification for software work: PayPal holds the money, Verdict checks the code."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "sqlalchemy>=2.0",
+  "alembic>=1.13",
+  "psycopg[binary]>=3.2",
+  "httpx>=0.27",
+  "celery[redis]>=5.4",
+  "redis>=5.0",
+  "boto3>=1.34",          # Cloudflare R2 (S3 API)
+  "anthropic>=0.40",
+  "mcp>=1.2",
+  "e2b>=1.0",
+  "hypothesis>=6.100",
+  "cryptography>=43",
+  "python-dotenv>=1.0",
+  "sentry-sdk>=2.0",
+  "langfuse>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+  "respx>=0.21",          # mock httpx calls to PayPal
+  "ruff>=0.6",
+  "mypy>=1.10",
+]
+scan = ["semgrep>=1.80"]   # heavy; install only where the scanner runs
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+ignore = ["S101"]          # asserts are fine in tests

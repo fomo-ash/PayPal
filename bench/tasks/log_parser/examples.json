@@ -1,0 +1,14 @@
+[
+ {
+  "input": "2026-11-01T10:00:00Z [INFO] server started",
+  "expected": "{\"entries\": [{\"ts\": \"2026-11-01T10:00:00Z\", \"level\": \"INFO\", \"msg\": \"server started\"}], \"skipped\": 0, \"counts\": {\"DEBUG\": 0, \"INFO\": 1, \"WARN\": 0, \"ERROR\": 0}}"
+ },
+ {
+  "input": "2026-11-01T10:00:01Z [error] db timeout\nnot a log line\n2026-11-01T10:00:02Z [WARNING] retrying",
+  "expected": "{\"entries\": [{\"ts\": \"2026-11-01T10:00:01Z\", \"level\": \"ERROR\", \"msg\": \"db timeout\"}, {\"ts\": \"2026-11-01T10:00:02Z\", \"level\": \"WARN\", \"msg\": \"retrying\"}], \"skipped\": 1, \"counts\": {\"DEBUG\": 0, \"INFO\": 0, \"WARN\": 1, \"ERROR\": 1}}"
+ },
+ {
+  "input": "",
+  "expected": "{\"entries\": [], \"skipped\": 0, \"counts\": {\"DEBUG\": 0, \"INFO\": 0, \"WARN\": 0, \"ERROR\": 0}}"
+ }
+]

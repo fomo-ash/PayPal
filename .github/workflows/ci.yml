@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest ruff
+      - name: Unit tests + bench (pure-logic, no secrets needed)
+        run: python -m pytest -q
+      - name: Lint
+        run: ruff check backend/verdict/core backend/verdict/grading backend/verdict/scanner
+      - name: Guard against committed secrets
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then echo ".env is committed!"; exit 1; fi
