@@ -8,6 +8,7 @@ Phase 3 adds the real AI judge (verdict.judge.review) between scoring and policy
 from __future__ import annotations
 
 import random
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -39,6 +40,13 @@ class GradeReport:
     flaky: list[str] = field(default_factory=list)
     payout: Payout | None = None
     decision: PolicyResult | None = None
+    seed: int | None = None          # stored with the verdict so the grading can be replayed
+
+
+def new_seed() -> int:
+    """Secret per-submission seed, drawn AFTER the code is submitted. A fixed or guessable seed
+    would let a worker generate the fresh inputs in advance and hard-code the answers."""
+    return secrets.randbits(64)
 
 
 def _passed(results: list[RunResult], expected: dict[str, str]) -> dict[str, bool]:
@@ -54,7 +62,7 @@ def grade(
     amount: str,
     fee_bps: int,
     timeout_s: float = 2.0,
-    seed: int = 0,
+    seed: int | None = None,
     ai_decision: AIDecision = AIDecision.CLEAR,
 ) -> GradeReport:
     files = {str(p.relative_to(submission_dir)): p.stat().st_size
@@ -66,6 +74,7 @@ def grade(
             findings += scan_source((submission_dir / rel).read_text(errors="replace"), rel)
     signals = hard_signals(findings) + ([HardSignal.REJECTED_FILE] if rejected else [])
     report = GradeReport(rejected, findings, sorted(set(signals)))
+    report.seed = new_seed() if seed is None else seed
 
     if rejected:   # never execute a submission that failed the reject list
         report.decision = PolicyResult(Settlement.VOID, Decimal(0),
@@ -85,7 +94,7 @@ def grade(
             second = _passed(runner.run_batch(submission_dir, failed, timeout_s), expected)
             report.flaky = [tid for tid in second if second[tid]]
 
-        rng = random.Random(seed)  # noqa: S311 - reproducible test inputs, not crypto
+        rng = random.Random(report.seed)  # noqa: S311 - seed is secret; Random only expands it
         fresh_cases: dict[str, list[tuple[str, str]]] = {}
         fresh_expected: dict[str, str] = {}
         for g, n in suite.fresh.items():

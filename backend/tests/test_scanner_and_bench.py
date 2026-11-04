@@ -36,3 +36,22 @@ def test_bench_outcomes_match_expectations():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod.main() == 0
+
+
+def test_seed_is_secret_and_recorded():
+    from verdict.grading.pipeline import new_seed
+    seeds = {new_seed() for _ in range(50)}
+    assert len(seeds) == 50 and all(0 <= s < 2**64 for s in seeds)
+
+
+def test_reference_timestamp_is_strict():
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[2] / "bench/tasks/log_parser/reference.py"
+    spec = importlib.util.spec_from_file_location("ref_strict", path)
+    ref = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ref)
+    assert ref._valid_ts("2028-02-29T00:00:00Z")
+    for bad in ["2026-11-01t10:00:00z", "٢٠٢٦-11-01T10:00:00Z", "2026-02-30T10:00:00Z",
+                "2026-1-01T10:00:00Z"]:
+        assert not ref._valid_ts(bad), bad

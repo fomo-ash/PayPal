@@ -7,7 +7,7 @@ Every row lists the attack, the defence, where it lives in code, and how we prov
 
 | ID | Attack | Defence | Code | Proof |
 |---|---|---|---|---|
-| W1 | Memorize expected answers (or leaked tests) | Fresh random inputs, reference solution as oracle; `rate = min(hidden, fresh)` | `core/scoring.py`, `grading/pipeline.py` | `bench: cheat_memorizer` (10/10 hidden, 30/200 fresh → VOID); `test_memorizer_is_capped_by_fresh_inputs` |
+| W1 | Memorize expected answers (or leaked tests) | Fresh random inputs, reference solution as oracle; `rate = min(hidden, fresh)` | `core/scoring.py`, `grading/pipeline.py` | `bench: cheat_memorizer` (10/10 hidden, 23/200 fresh → VOID); `test_memorizer_is_capped_by_fresh_inputs` |
 | W2 | Read hidden tests / expected outputs | Expected outputs never enter the sandbox; file listing/open is a hard signal | `sandbox/runner.py`, `scanner/ast_rules.py` | `bench: cheat_env_sniff` |
 | W3 | Fake results: conftest/pytest hooks, `sys.exit(0)`, `os._exit` | No test framework in the sandbox; pass/fail computed outside; reject list; exit calls are hard | `scanner/reject_list.py`, `sandbox/harness.py` | `bench: cheat_conftest`, `cheat_exit`; `test_harness_survives_exit_and_timeout` |
 | W4 | Prompt-inject the AI judge | AI has no amount input; text addressed to the grader is hard; code wrapped as untrusted | `core/policy.py`, `scanner/ast_rules.py`, `judge/prompts/review.md` | `bench: cheat_injection`; `test_ai_has_no_way_to_supply_an_amount` |
@@ -15,6 +15,7 @@ Every row lists the attack, the defence, where it lives in code, and how we prov
 | W6 | Probe hidden tests via repeated submissions | One graded submission per PayPal identity per job; only group scores before the verdict; examples-only runs unlimited | `api/routers/submissions.py` (Phase 2) | API test (Phase 2) |
 | W7 | Network, fork bomb, memory or CPU abuse, huge output | microVM no network; pid/mem/CPU/time/output caps; network/escape imports hard | `sandbox/e2b_runner.py`, `docker_runner.py` | Day-1 spike: confirm network is blocked |
 | W8 | Sybil accounts to probe | Log in with PayPal required; one graded submission per `payer_id` | `paypal/identity.py` (Phase 4) | |
+| W10 | Predict the fresh inputs (known seed + public generator) | Secret 64-bit seed per submission, drawn after submission and stored with the verdict for replay | `grading/pipeline.py::new_seed` | `test_seed_is_secret_and_recorded` |
 | W9 | Forge protocol lines from inside the harness process | Per-request random nonce, unknown/duplicate ids mean HARNESS_TAMPER; and forging gains nothing because comparison is outside | `sandbox/runner.py::parse_responses` | unit test (Phase 2) |
 
 ## Buyer attacks
@@ -40,6 +41,9 @@ Every row lists the attack, the defence, where it lives in code, and how we prov
 | P5 | Regulatory ("escrow") | Called "conditional payment"; production path is PayPal multiparty delayed disbursement |
 | P6 | Unclaimed payouts | Payout to `PAYPAL_ID` from Log in with PayPal |
 | P7 | Human reviewer overpays | `resolve_review` cannot exceed the deterministic capture (`test_reviewer_cannot_raise_payment`) |
+| P9 | AI decision read back from the DB as a plain/unknown string pays out | `decide()` coerces to the enum; anything unknown becomes HUMAN_REVIEW | `test_plain_or_unknown_ai_value_never_captures` |
+| P10 | Job stuck after PayPal refuses a capture or payout | `CAPTURING → HUMAN_REVIEW`, `PAYING_OUT → PAYOUT_FAILED`, `SUBMITTED → VOIDING` | `test_every_state_can_reach_a_terminal_state` |
+| P11 | Two workers move the same job at once | Compare-and-set state update (`UPDATE … WHERE state = :old`) | `db/repo.py`, `test_concurrent_transition_only_one_wins` |
 | P8 | Long fresh inputs make partial work earn $0 | Generators produce small inputs (found by the bench, documented in `grading/fresh_inputs.py`) |
 
 ## Known limits (say these honestly in the pitch)

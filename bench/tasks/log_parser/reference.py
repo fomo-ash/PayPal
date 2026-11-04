@@ -5,12 +5,13 @@ import json
 import re
 from datetime import datetime
 
+TS = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", re.ASCII)   # exact shape, ASCII only
 LINE = re.compile(r"^(\S+)[ \t]+\[([A-Za-z]+)\][ \t]+(.*)$")
 LEVELS = {"DEBUG": "DEBUG", "INFO": "INFO", "WARN": "WARN", "WARNING": "WARN", "ERROR": "ERROR"}
 
 
 def _valid_ts(ts: str) -> bool:
-    if len(ts) != 20:
+    if not TS.fullmatch(ts):   # strptime alone accepts "t"/"z" and non-ASCII digits
         return False
     try:
         datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")

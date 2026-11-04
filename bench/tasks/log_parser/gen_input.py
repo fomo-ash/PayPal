@@ -1,6 +1,7 @@
 """Fresh-input generator: random inputs from the same distribution as the spec.
 Accepted only if the reference solution runs on all generated inputs without error."""
 
+import calendar
 import random
 
 LEVELS = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "info", "Warn", "error", "TRACE", "FATAL"]
@@ -12,7 +13,9 @@ def _ts(rng: random.Random) -> str:
     if rng.random() < 0.1:   # sometimes an invalid date or format
         return rng.choice(["2026-02-30T10:00:00Z", "2026-13-01T00:00:00Z", "2026-11-01 10:00:00",
                            "2026-11-01T25:00:00Z", "yesterday", "2026-11-01T10:00:00+05:30"])
-    return (f"{rng.randint(2020, 2027):04d}-{rng.randint(1, 12):02d}-{rng.randint(1, 28):02d}"
+    year, month = rng.randint(2020, 2028), rng.randint(1, 12)
+    day = rng.randint(1, calendar.monthrange(year, month)[1])     # includes 29-31 and Feb 29
+    return (f"{year:04d}-{month:02d}-{day:02d}"
             f"T{rng.randint(0, 23):02d}:{rng.randint(0, 59):02d}:{rng.randint(0, 59):02d}Z")
 
 
