@@ -22,14 +22,26 @@ from verdict.config import get_settings  # noqa: E402
 from verdict.grading.compare import outputs_match  # noqa: E402
 from verdict.sandbox.e2b_runner import E2BRunner  # noqa: E402
 
+# A TCP handshake alone proves nothing: E2B's egress proxy accepts the connection and then
+# drops it. The real test is whether any bytes come BACK from the internet.
 NET_PROBE = '''
 import socket
-def solve(host):
+def solve(target):
+    if target == "dns":
+        try:
+            socket.getaddrinfo("example.com", 80)
+            return "OPEN dns resolves"
+        except OSError as exc:
+            return "BLOCKED dns " + type(exc).__name__
     try:
-        socket.create_connection((host, 443), timeout=3).close()
-        return "OPEN"
+        s = socket.create_connection((target, 80), timeout=3)
+        s.settimeout(3)
+        s.sendall(b"GET / HTTP/1.0\\r\\nHost: one.one.one.one\\r\\n\\r\\n")
+        data = s.recv(64)
+        s.close()
     except OSError as exc:
         return "BLOCKED " + type(exc).__name__
+    return f"OPEN got {data[:16]!r}" if data else "BLOCKED no bytes returned"
 '''
 
 
@@ -54,11 +66,16 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "solution.py").write_text(NET_PROBE)
-        net = runner.run_batch(Path(d), [("n1", "example.com"), ("n2", "1.1.1.1")], 6.0)
-    for r in net:
-        print(f"network probe {r.id}: {r.output or r.error}")
+        net = runner.run_batch(Path(d), [("dns", "dns"), ("ip-1.1.1.1", "1.1.1.1"),
+                                         ("ip-8.8.8.8", "8.8.8.8")], 10.0)
+    def blocked(r) -> bool:   # a lookup that hangs until the harness kills it is also blocked
+        return (r.output or "").startswith("BLOCKED") or "timeout" in (r.error or "")
 
-    ok = passed == len(core) and all((r.output or "").startswith("BLOCKED") for r in net)
+    for r in net:
+        print(f"network probe {r.id:<11} {'BLOCKED' if blocked(r) else 'OPEN!'}  "
+              f"({r.output or r.error})")
+
+    ok = passed == len(core) and all(blocked(r) for r in net)
     print("\nRESULT:", "PASS" if ok else "CHECK ABOVE")
     return 0 if ok else 1
 

@@ -1,10 +1,13 @@
+# Use the project virtualenv when it exists, so `make` never picks up a global Python.
+PY := $(if $(wildcard .venv/bin/python),.venv/bin/python,python)
+
 .PHONY: install test lint fmt api worker beat mcp spike e2b env services bench migrate
 
 install:
 	uv pip install -e ".[dev]"
 
 test:
-	python -m pytest -q
+	$(PY) -m pytest -q
 
 lint:
 	ruff check backend scripts agents bench
@@ -29,16 +32,16 @@ beat:
 	cd backend && celery -A verdict.worker.celery_app beat -l info
 
 mcp:
-	python -m verdict.mcp.server
+	$(PY) -m verdict.mcp.server
 
 env:
-	python scripts/check_env.py
+	$(PY) scripts/check_env.py
 
 spike:
-	python scripts/sandbox_spike.py
+	$(PY) scripts/sandbox_spike.py
 
 e2b:
-	python scripts/e2b_smoke.py
+	$(PY) scripts/e2b_smoke.py
 
 bench:
-	python bench/run_bench.py
+	$(PY) bench/run_bench.py

@@ -8,7 +8,11 @@ Per run_batch call:
   4. Kill the VM (always), cap the output size, parse with runner.parse_responses.
 Pass/fail is decided by the caller, outside the VM.
 
-Live check:  python scripts/e2b_smoke.py   (needs E2B_API_KEY; proves network is blocked)
+Live check:  make e2b   (needs E2B_API_KEY; proves network is blocked)
+Measured 2026-11-05: honest bench solution 18/18 in the VM, ~3-5s per batch incl. cold start.
+Network note: with allow_internet_access=False a TCP connect still "succeeds" (E2B's egress
+proxy accepts it) but zero bytes come back and DNS never resolves. So the smoke test checks
+for returned bytes, not for a refused connection.
 """
 
 from __future__ import annotations
