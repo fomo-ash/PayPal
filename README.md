@@ -206,11 +206,13 @@ make bench                      # grading pipeline on 2 honest + 5 cheating subm
 python scripts/check_env.py     # confirms which keys are set (never prints them)
 python scripts/sandbox_spike.py # day-1: runs authorize → partial capture → void → payout in the sandbox
 python scripts/llm_smoke.py     # checks the free LLM judge (needs LLM_API_KEY from Groq)
+python scripts/e2b_smoke.py     # runs code in an E2B microVM and proves network is blocked
 ```
 
 ### Local services (Phase 1+)
 ```bash
 docker compose up -d            # Postgres + Redis
+make migrate                    # create the tables (alembic upgrade head)
 make api                        # FastAPI on :8000
 make worker                     # Celery worker
 ngrok http 8000                 # public URL for PayPal webhooks
@@ -229,8 +231,8 @@ ngrok http 8000                 # public URL for PayPal webhooks
 | Phase | Dates | Goal | Status |
 |---|---|---|---|
 | 0 | Nov 1 | Repo structure, docs, scoring/policy/state machine/harness/scanner with tests, local grading bench (7/7 expected), sandbox spike script | ✅ this commit |
-| 1 | Nov 1–2 | Risk spikes: PayPal flow end to end in sandbox, E2B harness | ⏳ |
-| 2 | Nov 3–5 | DB, state machine wired to the API, outbox + money worker, grading pipeline, fresh inputs | ⏳ |
+| 1 | Nov 1–2 | Risk spikes: PayPal flow end to end in sandbox, E2B harness | ✅ PayPal spike 6/6 · E2B runner built (live check: `make e2b`) |
+| 2 | Nov 3–5 | DB, state machine wired to the API, outbox + money worker, grading pipeline, fresh inputs | 🟡 DB + migration, compare-and-set state, outbox, ledger, money worker, timers done · API wiring next |
 | 3 | Nov 6–7 | Scanner, policy engine wiring, AI judge, description check | ⏳ |
 | 4 | Nov 8–9 | Web UI, Log in with PayPal, receipts, code release, review queue | ⏳ |
 | 5 | Nov 10 | MCP + agent demo, dispute evidence, deploy | ⏳ |
