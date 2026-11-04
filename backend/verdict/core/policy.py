@@ -10,10 +10,10 @@ Hard rules (README "Design rules"):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 
-from verdict.core.scoring import ZERO, Payout
+from verdict.core.scoring import CENT, ZERO, Payout
 
 
 class AIDecision(StrEnum):
@@ -46,7 +46,17 @@ class PolicyResult:
     reason: str
 
 
+def _as_ai_decision(ai: object) -> AIDecision:
+    """DB values arrive as plain strings. Anything unknown fails SAFE (human review)."""
+    try:
+        return AIDecision(str(ai)) if isinstance(ai, str) else AIDecision.HUMAN_REVIEW
+    except ValueError:
+        return AIDecision.HUMAN_REVIEW
+
+
 def decide(payout: Payout, hard_signals: list[HardSignal], ai: AIDecision) -> PolicyResult:
+    ai = _as_ai_decision(ai)
+    hard_signals = [HardSignal(s) for s in hard_signals]
     if hard_signals:
         names = ", ".join(sorted(s.value for s in set(hard_signals)))
         return PolicyResult(Settlement.VOID, ZERO, f"hard signal(s): {names}")
@@ -68,7 +78,14 @@ class ReviewError(ValueError):
 
 def resolve_review(payout: Payout, reviewer_capture: Decimal | str) -> PolicyResult:
     """A human reviewer's final call. They may lower the amount or void, never raise it."""
-    amount = Decimal(str(reviewer_capture))
+    if isinstance(reviewer_capture, float):
+        raise ReviewError("capture must be Decimal or str, not float")
+    try:
+        amount = Decimal(str(reviewer_capture))
+    except InvalidOperation as exc:
+        raise ReviewError(f"not a number: {reviewer_capture!r}") from exc
+    if not amount.is_finite() or amount != amount.quantize(CENT):
+        raise ReviewError("capture must be a finite amount with at most 2 decimals")
     if amount < ZERO:
         raise ReviewError("capture cannot be negative")
     if amount > payout.capture:

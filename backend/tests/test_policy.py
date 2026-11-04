@@ -48,3 +48,23 @@ def test_reviewer_cannot_raise_payment():
 def test_reviewer_can_lower_or_void():
     assert resolve_review(payout(), "50.00").capture == D("50.00")
     assert resolve_review(payout(), "0").settlement is Settlement.VOID
+
+
+@pytest.mark.parametrize("raw", ["BLOCK_RECOMMENDED", "HUMAN_REVIEW", "BLOCK", "", None, "clear"])
+def test_plain_or_unknown_ai_value_never_captures(raw):
+    # Values come back from the DB as strings; anything not exactly CLEAR must not pay.
+    assert decide(payout(), [], raw).settlement is Settlement.HUMAN_REVIEW
+
+
+def test_plain_string_clear_still_captures():
+    assert decide(payout(), [], "CLEAR").settlement is Settlement.CAPTURE
+
+
+def test_hard_signal_as_plain_string_voids():
+    assert decide(payout(), ["NETWORK_ATTEMPT"], "CLEAR").settlement is Settlement.VOID
+
+
+@pytest.mark.parametrize("bad", ["50.005", "NaN", "Infinity", "abc", 50.0])
+def test_reviewer_amount_must_be_exact_cents(bad):
+    with pytest.raises(ReviewError):
+        resolve_review(payout(), bad)

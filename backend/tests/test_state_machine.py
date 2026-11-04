@@ -44,3 +44,33 @@ def test_every_state_with_a_hold_can_reach_a_terminal_state():
 
 def test_every_state_is_defined():
     assert set(TRANSITIONS) == set(S)
+
+
+def test_plain_strings_from_db_are_accepted_and_returned_as_enum():
+    assert transition("OPEN", "CLAIMED") is S.CLAIMED
+
+
+def test_unknown_state_is_illegal_not_keyerror():
+    with pytest.raises(IllegalTransition):
+        transition("OPENN", S.PAID)
+
+
+def test_failed_capture_and_payout_have_a_way_out():
+    assert S.HUMAN_REVIEW in TRANSITIONS[S.CAPTURING]
+    assert S.PAYOUT_FAILED in TRANSITIONS[S.PAYING_OUT]
+    assert transition(S.PAYOUT_FAILED, S.PAYING_OUT) is S.PAYING_OUT
+
+
+def test_hold_can_be_voided_while_waiting_for_grading():
+    assert S.VOIDING in TRANSITIONS[S.SUBMITTED]
+
+
+def test_every_state_can_reach_a_terminal_state():
+    for start in S:
+        seen, frontier = {start}, [start]
+        while frontier:
+            for n in TRANSITIONS[frontier.pop()]:
+                if n not in seen:
+                    seen.add(n)
+                    frontier.append(n)
+        assert seen & TERMINAL, start

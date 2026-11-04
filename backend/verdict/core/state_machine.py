@@ -24,6 +24,7 @@ class JobState(StrEnum):
     HUMAN_REVIEW = "HUMAN_REVIEW"        # hold kept, waiting for a person
     CAPTURING = "CAPTURING"              # outbox: capture(final_capture=true)
     PAYING_OUT = "PAYING_OUT"            # outbox: payout to worker
+    PAYOUT_FAILED = "PAYOUT_FAILED"      # captured, but the worker could not be paid
     PAID = "PAID"
     CODE_RELEASED = "CODE_RELEASED"      # terminal (success)
     VOIDING = "VOIDING"                  # outbox: void authorization
@@ -41,12 +42,13 @@ TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     S.FUNDED: frozenset({S.OPEN, S.VOIDING}),
     S.OPEN: frozenset({S.CLAIMED, S.VOIDING}),              # buyer withdraws / hold expiring
     S.CLAIMED: frozenset({S.SUBMITTED, S.OPEN, S.VOIDING}),  # deadline missed → OPEN again
-    S.SUBMITTED: frozenset({S.GRADING}),
+    S.SUBMITTED: frozenset({S.GRADING, S.VOIDING}),         # hold expiring while grading is down
     S.GRADING: frozenset({S.JUDGING, S.VOIDING}),           # hard signal can void immediately
     S.JUDGING: frozenset({S.CAPTURING, S.VOIDING, S.HUMAN_REVIEW}),
     S.HUMAN_REVIEW: frozenset({S.CAPTURING, S.VOIDING}),
-    S.CAPTURING: frozenset({S.PAYING_OUT}),
-    S.PAYING_OUT: frozenset({S.PAID}),
+    S.CAPTURING: frozenset({S.PAYING_OUT, S.HUMAN_REVIEW}),  # capture refused → a person decides
+    S.PAYING_OUT: frozenset({S.PAID, S.PAYOUT_FAILED}),
+    S.PAYOUT_FAILED: frozenset({S.PAYING_OUT}),             # admin fixes the receiver, retries
     S.PAID: frozenset({S.CODE_RELEASED}),
     S.VOIDING: frozenset({S.VOIDED}),
     S.CODE_RELEASED: frozenset(),
@@ -64,16 +66,20 @@ HOLD_ACTIVE = frozenset({
 
 
 class IllegalTransition(Exception):
-    def __init__(self, current: JobState, target: JobState):
+    def __init__(self, current: JobState | str, target: JobState | str):
         super().__init__(f"illegal transition {current} → {target}")
         self.current, self.target = current, target
 
 
-def can_transition(current: JobState, target: JobState) -> bool:
-    return target in TRANSITIONS[current]
+def can_transition(current: JobState | str, target: JobState | str) -> bool:
+    try:
+        return JobState(target) in TRANSITIONS[JobState(current)]
+    except ValueError:
+        return False
 
 
-def transition(current: JobState, target: JobState) -> JobState:
+def transition(current: JobState | str, target: JobState | str) -> JobState:
+    """Validates a move. Values from the DB may be plain strings; unknown names are illegal."""
     if not can_transition(current, target):
         raise IllegalTransition(current, target)
-    return target
+    return JobState(target)

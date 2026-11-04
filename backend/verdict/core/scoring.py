@@ -126,6 +126,9 @@ def compute_payout(
     worker = capture - fee
     released = amt - capture
 
-    assert ZERO <= capture <= amt
-    assert worker >= ZERO and capture + released == amt
+    # Explicit checks, not `assert`: asserts disappear under `python -O`.
+    if not ZERO <= capture <= amt:
+        raise ScoringError(f"invariant broken: capture {capture} outside [0, {amt}]")
+    if worker < ZERO or capture + released != amt:
+        raise ScoringError("invariant broken: amounts do not reconcile")
     return Payout(score, raw, capture, fee, worker, released, rates)

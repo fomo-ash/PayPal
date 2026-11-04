@@ -9,6 +9,10 @@ DRAFT ──► VALIDATING ──► AWAITING_FUNDS ──► FUNDED ──► O
 CANCELLED   INVALID ──► DRAFT  CANCELLED       │         │                                     │           ├──► HUMAN_REVIEW ──► CAPTURING / VOIDING
                                                └─────────┴──────────► VOIDING ◄──────────────────┘           └──► VOIDING ──► VOIDED ✔
                                               (buyer withdraws / hold expiring / hard signal / zero score)
+
+Failure exits:  SUBMITTED ──► VOIDING          (hold expiring while grading is unavailable)
+                CAPTURING ──► HUMAN_REVIEW     (PayPal refused the capture)
+                PAYING_OUT ──► PAYOUT_FAILED ──► PAYING_OUT   (receiver fixed, payout retried)
 ```
 
 | State | Hold active? | Entered by | Side effect (via outbox) |
@@ -24,6 +28,7 @@ CANCELLED   INVALID ──► DRAFT  CANCELLED       │         │            
 | HUMAN_REVIEW | yes | policy | notify reviewer |
 | CAPTURING | yes | policy CAPTURE | `capture(amount, final_capture=true)` |
 | PAYING_OUT | no | capture completed | `payouts(worker, amount − fee)` |
+| PAYOUT_FAILED | no | payout refused / returned | admin alert; retry after the receiver is fixed |
 | PAID | no | payout succeeded | build signed receipt |
 | CODE_RELEASED | no | receipt done | buyer can download code |
 | VOIDING | yes | policy VOID / withdraw / expiry | `void(authorization)` |
@@ -36,5 +41,15 @@ CANCELLED   INVALID ──► DRAFT  CANCELLED       │         │            
 
 ## Invariants (tested)
 - `CODE_RELEASED` is reachable only from `PAID`.
+- Every state (not only those with a hold) can reach a terminal state: no job can get stuck.
+- `transition()` accepts plain strings from the DB, returns a `JobState`, and treats unknown names as illegal.
 - No path goes from SUBMITTED to CAPTURING without GRADING and JUDGING.
 - Every state with an active hold can reach a terminal state.
+
+## Concurrency (Phase 2)
+`transition()` only validates a move. The database write is a compare-and-set, so two workers
+can never both move the same job:
+```sql
+UPDATE jobs SET state = :new WHERE id = :id AND state = :old   -- 0 rows → someone else moved it
+```
+Implemented in `backend/verdict/db/repo.py`.

@@ -73,3 +73,10 @@ def test_weights_must_sum_to_one():
 def test_group_without_tests_is_rejected():
     with pytest.raises(ScoringError):
         compute_payout("10.00", [GroupResult("a", D("1"), 0, 0)], "0", 0)
+
+
+def test_invariants_are_checked_without_assert():
+    import inspect
+
+    from verdict.core import scoring
+    assert "assert " not in inspect.getsource(scoring.compute_payout)
