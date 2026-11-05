@@ -43,6 +43,9 @@ class GradeReport:
     seed: int | None = None          # stored with the verdict so the grading can be replayed
 
 
+FreshBuilder = Callable[[int], tuple[dict[str, list[tuple[str, str]]], dict[str, str]]]
+
+
 def new_seed() -> int:
     """Secret per-submission seed, drawn AFTER the code is submitted. A fixed or guessable seed
     would let a worker generate the fresh inputs in advance and hard-code the answers."""
@@ -57,14 +60,17 @@ def grade(
     submission_dir: Path,
     suite: Suite,
     runner: Runner,
-    reference_solve: Callable[[str], str],
-    gen_input: Callable[[random.Random], str],
+    reference_solve: Callable[[str], str] | None,
+    gen_input: Callable[[random.Random], str] | None,
     amount: str,
     fee_bps: int,
     timeout_s: float = 2.0,
     seed: int | None = None,
     ai_decision: AIDecision = AIDecision.CLEAR,
+    fresh_builder: FreshBuilder | None = None,
 ) -> GradeReport:
+    """Bench/dev: pass reference_solve + gen_input (in-process). Production: pass
+    fresh_builder (grading.oracle), which runs the buyer's code in its own sandbox."""
     files = {str(p.relative_to(submission_dir)): p.stat().st_size
              for p in submission_dir.rglob("*") if p.is_file()}
     rejected = check_files(files)
@@ -81,7 +87,7 @@ def grade(
                                        "rejected files: " + "; ".join(rejected))
         return report
     if report.signals:   # a hard signal voids regardless of tests; don't spend sandbox time
-        report.decision = decide(_zero_payout(suite, amount, fee_bps), report.signals, ai_decision)
+        report.decision = decide(zero_payout(suite, amount, fee_bps), report.signals, ai_decision)
         return report
 
     expected = {t["id"]: t["expected"] for t in suite.tests}
@@ -94,17 +100,21 @@ def grade(
             second = _passed(runner.run_batch(submission_dir, failed, timeout_s), expected)
             report.flaky = [tid for tid in second if second[tid]]
 
-        rng = random.Random(report.seed)  # noqa: S311 - seed is secret; Random only expands it
         fresh_cases: dict[str, list[tuple[str, str]]] = {}
         fresh_expected: dict[str, str] = {}
-        for g, n in suite.fresh.items():
-            fresh_cases[g] = []
-            for i in range(n):
-                x = gen_input(rng)
-                fid = f"fresh-{g}-{i}"
-                fresh_cases[g].append((fid, x))
-                # in production the reference runs in ITS OWN sandbox
-                fresh_expected[fid] = reference_solve(x)
+        if fresh_builder is not None:
+            fresh_cases, fresh_expected = fresh_builder(report.seed)
+        elif suite.fresh:
+            if gen_input is None or reference_solve is None:
+                raise ValueError("fresh inputs need gen_input + reference_solve or fresh_builder")
+            rng = random.Random(report.seed)  # noqa: S311 - seed is secret; Random only expands it
+            for g, n in suite.fresh.items():
+                fresh_cases[g] = []
+                for i in range(n):
+                    x = gen_input(rng)
+                    fid = f"fresh-{g}-{i}"
+                    fresh_cases[g].append((fid, x))
+                    fresh_expected[fid] = reference_solve(x)
         fresh_pass: dict[str, bool] = {}
         all_fresh = [c for cases in fresh_cases.values() for c in cases]
         if all_fresh:
@@ -112,7 +122,7 @@ def grade(
                                  fresh_expected)
     except TamperDetected:
         report.signals = sorted(set(report.signals) | {HardSignal.HARNESS_TAMPER})
-        report.decision = decide(_zero_payout(suite, amount, fee_bps), report.signals, ai_decision)
+        report.decision = decide(zero_payout(suite, amount, fee_bps), report.signals, ai_decision)
         return report
 
     by_group: dict[str, list[bool]] = {g: [] for g in suite.groups}
@@ -121,7 +131,7 @@ def grade(
             by_group[t["group"]].append(first[t["id"]])
     report.hidden = {g: (sum(v), len(v)) for g, v in by_group.items()}
     report.fresh = {g: (sum(fresh_pass[f] for f, _ in cases), len(cases))
-                    for g, cases in fresh_cases.items()}
+                    for g, cases in fresh_cases.items() if cases}
 
     groups = [GroupResult(g, w, *report.hidden[g],
                           *(report.fresh[g] if g in report.fresh else (None, None)))
@@ -131,6 +141,6 @@ def grade(
     return report
 
 
-def _zero_payout(suite: Suite, amount: str, fee_bps: int) -> Payout:
+def zero_payout(suite: Suite, amount: str, fee_bps: int) -> Payout:
     groups = [GroupResult(g, w, 0, 1) for g, w in suite.groups.items()]
     return compute_payout(amount, groups, suite.min_score, fee_bps)

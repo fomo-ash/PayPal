@@ -6,7 +6,6 @@ from decimal import Decimal as D
 
 import httpx
 import pytest
-import respx
 from sqlalchemy import select
 
 from verdict.core import ledger
@@ -17,22 +16,11 @@ from verdict.core.scoring import GroupResult, compute_payout
 from verdict.core.state_machine import JobState as S
 from verdict.db.models import Claim, Job, Outbox, Submission, User, Verdict
 from verdict.db.repo import move_job, verify_audit_chain
-from verdict.paypal.client import PayPalClient
 from verdict.worker import money
 
 BASE = "https://api-m.sandbox.paypal.com"
 AUTH = "AUTH-1"
 T0 = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=1)  # just after real "now"
-
-
-@pytest.fixture
-def pp():
-    with respx.mock(base_url=BASE, assert_all_called=False) as mock:
-        mock.post("/v1/oauth2/token").respond(json={"access_token": "t", "expires_in": 3600})
-        client = PayPalClient(BASE, "id", "secret")
-        client.mock = mock
-        yield client
-        client.close()
 
 
 def honest_payout():   # README example: 81.5% → capture 81.50, fee 4.08, worker 77.42

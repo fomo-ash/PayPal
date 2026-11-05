@@ -1,4 +1,4 @@
-"""Settings loaded from environment / .env. Import `settings` everywhere; never read os.environ directly."""
+"""Settings from environment / .env. Import get_settings() everywhere; never read os.environ."""
 
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = "gemini-flash-latest"
 
+    dev_auth: bool = True                     # X-User-Id header login; never with live
     sandbox_backend: str = "e2b"
     e2b_api_key: str = ""
     sandbox_test_timeout_ms: int = 2000
@@ -41,6 +42,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://verdict:verdict@localhost:5432/verdict"
     redis_url: str = "redis://localhost:6379/0"
 
+    blob_dir: str = "data/blobs"               # LocalBlobStore root (git-ignored)
     r2_account_id: str = ""
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""

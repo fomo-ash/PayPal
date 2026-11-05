@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlalchemy.pool import StaticPool
@@ -51,4 +52,141 @@ def make_job(Session):
             s.add(job)
             s.flush()
             return job.id
+    return _make
+
+
+BENCH = Path(__file__).resolve().parents[2] / "bench" / "tasks" / "log_parser"
+
+
+@pytest.fixture
+def bench_upload():
+    """The log_parser bench task as a buyer's suite upload document."""
+    import json
+
+    hidden = json.loads((BENCH / "hidden_tests.json").read_text())
+    return {"groups": hidden["groups"], "fresh": hidden["fresh"], "tests": hidden["tests"],
+            "examples": json.loads((BENCH / "examples.json").read_text()),
+            "reference": (BENCH / "reference.py").read_text(),
+            "generator": (BENCH / "gen_input.py").read_text()}
+
+
+PAYPAL_BASE = "https://api-m.sandbox.paypal.com"
+
+
+@pytest.fixture
+def pp():
+    """A real PayPalClient whose HTTP calls go to a respx mock (pp.mock)."""
+    import respx
+
+    from verdict.paypal.client import PayPalClient
+
+    with respx.mock(base_url=PAYPAL_BASE, assert_all_called=False) as mock:
+        mock.post("/v1/oauth2/token").respond(json={"access_token": "t", "expires_in": 3600})
+        client = PayPalClient(PAYPAL_BASE, "id", "secret")
+        client.mock = mock
+        yield client
+        client.close()
+
+
+@pytest.fixture
+def services(Session, pp, tmp_path):
+    from verdict.api.deps import Services
+    from verdict.config import Settings
+    from verdict.sandbox.runner import LocalRunner
+    from verdict.storage import LocalBlobStore
+
+    queued = []
+    svc = Services(settings=Settings(_env_file=None, dev_auth=True, sandbox_backend="local",
+                                     paypal_webhook_id="WH-1"),
+                   Session=Session, store=LocalBlobStore(tmp_path / "blobs"), paypal=pp,
+                   runner=LocalRunner(), enqueue_grading=queued.append)
+    svc.queued = queued                      # submission ids the API asked to grade
+    return svc
+
+
+@pytest.fixture
+def api(services):
+    from fastapi.testclient import TestClient
+
+    from verdict.api.main import create_app
+
+    with TestClient(create_app(services)) as client:
+        client.services = services
+        yield client
+
+
+@pytest.fixture
+def user(api):
+    """user("buyer") → headers for a new dev user with that role."""
+    def _make(role: str, **kw):
+        r = api.post("/dev/users", json={"role": role, **kw})
+        assert r.status_code == 201, r.text
+        return {"X-User-Id": r.json()["id"]}
+    return _make
+
+
+@pytest.fixture
+def draft_job(api, user, bench_upload):
+    """draft_job(validate=True) → (buyer headers, job id) with the bench suite uploaded."""
+    def _make(validate: bool = True, **kw):
+        h = user("buyer", email="buyer@example.com")
+        body = {"title": "Parse logs", "spec_md": "see spec", "amount": "100.00", **kw}
+        r = api.post("/jobs", json=body, headers=h)
+        assert r.status_code == 201, r.text
+        job_id = r.json()["id"]
+        assert api.put(f"/jobs/{job_id}/suite", json=bench_upload, headers=h).status_code == 200
+        if validate:
+            r = api.post(f"/jobs/{job_id}/validate", headers=h)
+            assert r.json()["state"] == "AWAITING_FUNDS", r.text
+        return h, job_id
+    return _make
+
+
+def mock_order(pp, job_id, *, amount="100.00", status="CREATED", order_id="ORDER-1",
+               auth_id="AUTH-1"):
+    """Mock create order + authorize for one job; returns the authorize route."""
+    pp.mock.post("/v2/checkout/orders").respond(201, json={
+        "id": order_id, "status": "PAYER_ACTION_REQUIRED",
+        "links": [{"rel": "payer-action", "href": f"https://sandbox.paypal.test/{order_id}"}]})
+    return pp.mock.post(f"/v2/checkout/orders/{order_id}/authorize").respond(201, json={
+        "id": order_id, "status": "COMPLETED",
+        "purchase_units": [{"reference_id": str(job_id), "payments": {"authorizations": [{
+            "id": auth_id, "status": status,
+            "amount": {"currency_code": "USD", "value": amount}}]}}]})
+
+
+@pytest.fixture
+def open_job(api, draft_job, pp):
+    """open_job() → (buyer headers, job id) for a funded, OPEN job (PayPal mocked)."""
+    def _make(**kw):
+        h, job_id = draft_job(**kw)
+        mock_order(pp, job_id)
+        assert api.post(f"/jobs/{job_id}/fund", headers=h).status_code == 200
+        r = api.post(f"/jobs/{job_id}/fund/confirm", headers=h)
+        assert r.json()["state"] == "OPEN", r.text
+        return h, job_id
+    return _make
+
+
+def bench_files(name: str) -> dict:
+    """A bench submission as an API upload body."""
+    root = BENCH / "submissions" / name
+    return {"files": {p.relative_to(root).as_posix(): p.read_text()
+                      for p in sorted(root.rglob("*")) if p.is_file()
+                      and "__pycache__" not in p.parts}}
+
+
+@pytest.fixture
+def submitted(api, user, open_job):
+    """submitted("honest_full") → (buyer, worker, job id, submission id) through the API."""
+    def _make(name: str, **kw):
+        import uuid as _uuid
+
+        buyer, job_id = open_job(**kw)
+        w = user("worker", email=f"{name}@example.com",
+                 paypal_payer_id=f"P{_uuid.uuid4().hex[:10].upper()}")
+        assert api.post(f"/jobs/{job_id}/claim", headers=w).status_code == 201
+        r = api.post(f"/jobs/{job_id}/submit", json=bench_files(name), headers=w)
+        assert r.status_code == 201, r.text
+        return buyer, w, job_id, r.json()["submission_id"]
     return _make
