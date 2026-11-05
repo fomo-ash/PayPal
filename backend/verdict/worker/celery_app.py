@@ -1,5 +1,6 @@
 """Celery app. Queues: grading (sandbox-heavy), judge (LLM), money (PayPal, run with
-concurrency 1). Beat: outbox every 30s, claim deadlines every minute, holds every 10 minutes.
+concurrency 1). Beat: outbox every 30s, claim deadlines every minute, holds every 10 minutes,
+lost grading tasks every 5 minutes.
 
 Run:  make worker   (celery -A verdict.worker.celery_app worker -Q money,grading,judge)
       make beat
@@ -22,12 +23,14 @@ app.conf.update(
         "verdict.worker.tasks.expire_holds": {"queue": "money"},
         "verdict.worker.tasks.expire_claims": {"queue": "money"},
         "verdict.worker.tasks.grade_submission": {"queue": "grading"},
+        "verdict.worker.tasks.requeue_stale": {"queue": "grading"},
         "verdict.worker.tasks.judge_submission": {"queue": "judge"},
     },
     beat_schedule={
         "outbox": {"task": "verdict.worker.tasks.process_outbox", "schedule": 30.0},
         "claims": {"task": "verdict.worker.tasks.expire_claims", "schedule": 60.0},
         "holds": {"task": "verdict.worker.tasks.expire_holds", "schedule": 600.0},
+        "stale_grading": {"task": "verdict.worker.tasks.requeue_stale", "schedule": 300.0},
     },
     timezone="UTC",
 )

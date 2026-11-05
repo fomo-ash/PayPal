@@ -61,6 +61,8 @@ def test_celery_routes_money_tasks_to_the_money_queue_and_schedules_timers():
     assert routes["verdict.worker.tasks.process_outbox"]["queue"] == "money"
     assert {e["task"] for e in app.conf.beat_schedule.values()} == {
         "verdict.worker.tasks.process_outbox", "verdict.worker.tasks.expire_claims",
-        "verdict.worker.tasks.expire_holds"}
+        "verdict.worker.tasks.expire_holds", "verdict.worker.tasks.requeue_stale"}
+    assert routes["verdict.worker.tasks.grade_submission"]["queue"] == "grading"
     import verdict.worker.tasks as tasks
     assert tasks.process_outbox.name in app.tasks
+    assert tasks.grade_submission.name in app.tasks
