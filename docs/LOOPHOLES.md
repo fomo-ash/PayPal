@@ -12,7 +12,7 @@ Every row lists the attack, the defence, where it lives in code, and how we prov
 | W3 | Fake results: conftest/pytest hooks, `sys.exit(0)`, `os._exit` | No test framework in the sandbox; pass/fail computed outside; reject list; exit calls are hard | `scanner/reject_list.py`, `sandbox/harness.py` | `bench: cheat_conftest`, `cheat_exit`; `test_harness_survives_exit_and_timeout` |
 | W4 | Prompt-inject the AI judge | AI has no amount input; text addressed to the grader is hard; code wrapped as untrusted | `core/policy.py`, `scanner/ast_rules.py`, `judge/prompts/review.md` | `bench: cheat_injection`; `test_ai_has_no_way_to_supply_an_amount` |
 | W5 | Detect grading environment, behave differently | Hidden and fresh inputs go through the same harness; env access flagged (soft); no network | `scanner/ast_rules.py` | `bench: cheat_env_sniff` |
-| W6 | Probe hidden tests via repeated submissions | One graded submission per PayPal identity per job; only group scores before the verdict; examples-only runs unlimited | `api/routers/submissions.py` (Phase 2) | API test (Phase 2) |
+| W6 | Probe hidden tests via repeated submissions | One graded submission per PayPal identity per job; only group scores before the verdict; examples-only runs unlimited | `api/routers/submissions.py` | `test_api_submissions.py` (second submit and re-claim refused) |
 | W7 | Network, fork bomb, memory or CPU abuse, huge output | microVM no network; pid/mem/CPU/time/output caps; network/escape imports hard | `sandbox/e2b_runner.py`, `docker_runner.py` | `make e2b`: DNS + raw IP probes return no bytes (verified Nov 5) |
 | W8 | Sybil accounts to probe | Log in with PayPal required; one graded submission per `payer_id` | `paypal/identity.py` (Phase 4) | |
 | W10 | Predict the fresh inputs (known seed + public generator) | Secret 64-bit seed per submission, drawn after submission and stored with the verdict for replay | `grading/pipeline.py::new_seed` | `test_seed_is_secret_and_recorded` |
@@ -22,9 +22,9 @@ Every row lists the attack, the defence, where it lives in code, and how we prov
 
 | ID | Attack | Defence | Code |
 |---|---|---|---|
-| B1 | Impossible tests so nothing is ever paid | Reference solution must pass 100% of hidden tests before funding | `worker/tasks.py::validate_suite` (Phase 2) |
+| B1 | Impossible tests so nothing is ever paid | Reference solution must pass 100% of hidden tests before funding | `api/routers/jobs.py::validate` (reference runs in the sandbox; generator checked too) · `test_api_jobs.py` |
 | B2 | Tests not implied by the spec | AI spec check per test; flagged tests block funding until fixed; worker sees which tests were excluded after the verdict | `judge/spec_check.py` (Phase 3) |
-| B3 | Change tests after seeing the code | Suite sealed by SHA-256 at funding; hash shown to the worker before accepting; grader refuses mismatches | `bench/tools/build_suite.py` (hash), `api` (Phase 2) |
+| B3 | Change tests after seeing the code | Suite sealed by SHA-256 at funding; hash shown to the worker before accepting; grader refuses mismatches | `grading/suite.py::seal` (tests + examples + reference + generator), sealed in `fund/confirm`, `worker/grading.py` refuses a mismatch · `test_suite_and_oracle.py` |
 | B4 | Take the code without paying | Code released only in state `CODE_RELEASED`, reachable only from `PAID` | `core/state_machine.py`; `test_code_only_released_after_payment` |
 | B5 | Chargeback after delivery | Evidence auto-submitted via Disputes API; delayed payouts and limits for new buyers; platform loss reserve. **Reduced, not eliminated.** | `paypal/disputes.py` (Phase 5) |
 | B6 | Let the hold expire mid-job | Deadline of 48h or less (inside the 3-day honor period); reauthorize once (days 4–29) or milestones | `core/state_machine.py`, beat timers |

@@ -231,8 +231,8 @@ ngrok http 8000                 # public URL for PayPal webhooks
 | Phase | Dates | Goal | Status |
 |---|---|---|---|
 | 0 | Nov 1 | Repo structure, docs, scoring/policy/state machine/harness/scanner with tests, local grading bench (7/7 expected), sandbox spike script | ✅ this commit |
-| 1 | Nov 1–2 | Risk spikes: PayPal flow end to end in sandbox, E2B harness | ✅ PayPal spike 6/6 · E2B runner built (live check: `make e2b`) |
-| 2 | Nov 3–5 | DB, state machine wired to the API, outbox + money worker, grading pipeline, fresh inputs | 🟡 DB + migration, compare-and-set state, outbox, ledger, money worker, timers done · API wiring next |
+| 1 | Nov 1–2 | Risk spikes: PayPal flow end to end in sandbox, E2B harness | ✅ PayPal spike 6/6 · E2B live: 18/18 in ~3.5s, network blocked |
+| 2 | Nov 3–5 | DB, state machine wired to the API, outbox + money worker, grading pipeline, fresh inputs | ✅ API: post → suite → validate → fund → claim → submit → grade → capture/void → payout → code; buyer code sandboxed too; webhooks verified + deduped |
 | 3 | Nov 6–7 | Scanner, policy engine wiring, AI judge, description check | ⏳ |
 | 4 | Nov 8–9 | Web UI, Log in with PayPal, receipts, code release, review queue | ⏳ |
 | 5 | Nov 10 | MCP + agent demo, dispute evidence, deploy | ⏳ |

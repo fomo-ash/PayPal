@@ -14,8 +14,8 @@
 | 0 | 1 | Nov 1 | Repo structure, docs, scoring/policy/state machine/harness/scanner with tests, local bench | `make test` and `make bench` green ✅ |
 | 1 | 1–2 | Nov 1–2 | **Risk spikes:** `sandbox_spike.py` all PASS (A); E2B runner runs the bench with network blocked (B) | PayPal 6/6 ✅ · E2B runner + fake-VM tests ✅ · live `make e2b` pending key |
 | 2 | 3 | Nov 3 | DB models + Alembic, state machine persisted, outbox + money worker (A, D) | Unit tests with PayPal mocked (respx) ✅ |
-| 2 | 4 | Nov 4 | Suite upload, seal hash, reference validation, grading via E2B (B) | A job graded through the API |
-| 2 | 5 | Nov 5 | Fresh-input generator acceptance, flaky handling in prod path, webhooks (A, B) | Memorizer voided via API |
+| 2 | 4 | Nov 4 | Suite upload, seal hash, reference validation, grading via E2B (B) | A job graded through the API ✅ |
+| 2 | 5 | Nov 5 | Fresh-input generator acceptance, flaky handling in prod path, webhooks (A, B) | Memorizer voided via API ✅ (e2e test) |
 | 3 | 6 | Nov 6 | Semgrep rules, 3 more cheat agents, AI judge with JSON schema (C) | Judge cites lines; AI-alone → review |
 | 3 | 7 | Nov 7 | AI spec check (B2), Langfuse tracing, judge red-team (C) | Unfair test blocked before funding |
 | 4 | 8 | Nov 8 | Web: post/fund (PayPal Buttons), browse/claim/submit, verdict page (D) | Full flow in the browser |
