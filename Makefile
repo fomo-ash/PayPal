@@ -1,7 +1,7 @@
 # Use the project virtualenv when it exists, so `make` never picks up a global Python.
 PY := $(if $(wildcard .venv/bin/python),.venv/bin/python,python)
 
-.PHONY: install test lint fmt api worker beat mcp spike e2b env services bench migrate
+.PHONY: install test lint fmt api worker beat mcp spike e2b env services bench migrate local demo
 
 install:
 	uv pip install -e ".[dev]"
@@ -24,6 +24,17 @@ api:
 
 migrate:
 	alembic upgrade head
+
+# Whole flow on one laptop: SQLite file + grading/payouts in-process (no Postgres/Redis).
+LOCAL_DB := sqlite:///data/verdict.db
+local:
+	mkdir -p data
+	DATABASE_URL=$(LOCAL_DB) $(PY) -m alembic -x url=$(LOCAL_DB) upgrade head
+	DATABASE_URL=$(LOCAL_DB) INLINE_WORKER=true $(PY) -m uvicorn verdict.api.main:app --port 8000 --app-dir backend
+
+SUB ?= honest_full
+demo:
+	$(PY) scripts/demo_flow.py $(SUB)
 
 worker:
 	cd backend && celery -A verdict.worker.celery_app worker -Q money,grading,judge -l info

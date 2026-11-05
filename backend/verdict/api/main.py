@@ -64,9 +64,13 @@ def default_services(cfg: Settings) -> Services:
 
     paypal = (PayPalClient(cfg.paypal_base_url, cfg.paypal_client_id, cfg.paypal_secret)
               if cfg.paypal_client_id and cfg.paypal_secret else None)
-    return Services(settings=cfg, Session=make_session_factory(cfg.database_url),
-                    store=LocalBlobStore(cfg.blob_dir), paypal=paypal,
-                    runner=make_runner(cfg), enqueue_grading=enqueue_grading)
+    svc = Services(settings=cfg, Session=make_session_factory(cfg.database_url),
+                   store=LocalBlobStore(cfg.blob_dir), paypal=paypal,
+                   runner=make_runner(cfg), enqueue_grading=enqueue_grading)
+    if cfg.inline_worker:
+        from verdict.worker.inline import start
+        svc.enqueue_grading = lambda submission_id: start(svc, submission_id)
+    return svc
 
 
 def __getattr__(name: str):    # `uvicorn verdict.api.main:app` builds the app on first access

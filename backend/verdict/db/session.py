@@ -13,6 +13,9 @@ from sqlalchemy.orm import sessionmaker
 
 
 def make_engine(url: str, **kw) -> Engine:
+    if url.startswith("sqlite") and "connect_args" not in kw:
+        # local demo mode: API threads + the inline worker thread share one SQLite file
+        kw["connect_args"] = {"check_same_thread": False, "timeout": 30}
     engine = create_engine(url, pool_pre_ping=True, future=True, **kw)
     if engine.dialect.name == "sqlite":
         @event.listens_for(engine, "connect")

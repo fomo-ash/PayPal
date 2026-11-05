@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     paypal_webhook_id: str = ""
     paypal_return_url: str = "http://localhost:3000/fund/return"
     paypal_cancel_url: str = "http://localhost:3000/fund/cancel"
+    sandbox_worker_email: str = ""            # demo worker's sandbox PayPal (payout receiver)
     paypal_login_redirect_uri: str = "http://localhost:3000/auth/callback"
 
     # LLM: any OpenAI-compatible provider. Default: Groq free tier, Gemini free tier as fallback.
@@ -33,6 +34,7 @@ class Settings(BaseSettings):
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = "gemini-flash-latest"
 
+    inline_worker: bool = False               # `make local`: grade + pay in-process, no Redis
     dev_auth: bool = True                     # X-User-Id header login; never with live
     sandbox_backend: str = "e2b"
     e2b_api_key: str = ""
