@@ -48,6 +48,11 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def as_utc(dt: datetime) -> datetime:
+    """SQLite returns naive datetimes for TZ columns; every value we store is UTC."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
 Money = Numeric(12, 2, asdecimal=True)
 Fraction = Numeric(5, 4, asdecimal=True)          # weights, min_score: 0.0000 … 1.0000
 JsonDoc = JSON().with_variant(JSONB(), "postgresql")
@@ -235,7 +240,9 @@ class Verdict(Base):
     __table_args__ = (
         CheckConstraint("capture >= 0 AND fee >= 0 AND worker_amount >= 0 AND released >= 0",
                         name="money_non_negative"),
-        CheckConstraint("capture = fee + worker_amount", name="capture_split"),
+        # Exact on Postgres NUMERIC(12,2) (any real difference is >= 0.01); also correct on
+        # SQLite, which stores NUMERIC as a float in the unit tests.
+        CheckConstraint("abs(capture - fee - worker_amount) < 0.005", name="capture_split"),
     )
 
 
