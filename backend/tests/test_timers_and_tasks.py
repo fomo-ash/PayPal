@@ -7,7 +7,7 @@ from verdict.db.models import Claim, Outbox, User
 from verdict.db.repo import move_job
 from verdict.worker import timers
 
-T0 = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+T0 = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=1)  # just after real "now"
 
 
 def claimed_job(Session, make_job, deadline):

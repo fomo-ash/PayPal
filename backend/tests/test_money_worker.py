@@ -22,7 +22,7 @@ from verdict.worker import money
 
 BASE = "https://api-m.sandbox.paypal.com"
 AUTH = "AUTH-1"
-T0 = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+T0 = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=1)  # just after real "now"
 
 
 @pytest.fixture
