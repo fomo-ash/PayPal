@@ -19,8 +19,8 @@
 | 3 | 6 | Nov 6 | Semgrep rules, 3 more cheat agents, AI judge with JSON schema (C) | Judge cites lines; AI-alone → review ✅ (done Nov 9; time-bomb cheat added, Semgrep cut) |
 | 3 | 7 | Nov 7 | AI spec check (B2), Langfuse tracing, judge red-team (C) | Unfair test blocked before funding ✅ · admin review API ✅ · Langfuse deferred |
 | 4 | 8 | Nov 8 | Web: post/fund (PayPal Buttons), browse/claim/submit, verdict page (D) | Full flow in the browser |
-| 4 | 9 | Nov 9 | Log in with PayPal, code release, signed receipt + `/verify`, admin review (A, D) | Every loophole has a working answer |
-| 5 | 10 | Nov 10 | MCP server + LLM worker agent, dispute evidence, deploy to Render (D, A) | Agent paid in the hosted demo |
+| 4 | 9 | Nov 9 | Log in with PayPal, code release, signed receipt + `/verify`, admin review (A, D) | Every loophole has a working answer · backend ✅ Nov 9 |
+| 5 | 10 | Nov 10 | MCP server + LLM worker agent, dispute evidence, deploy to Render (D, A) | Agent paid in the hosted demo · MCP + agents ✅ Nov 9 (local) |
 | 6 | 11 | Nov 11 | Bench to 4 tasks × 8 submissions, results table, Playwright e2e, video recorded | 0 honest blocked; video < 3:00 |
 | 6 | 12 | Nov 12 AM | Submit: public repo, MIT in About, demo URL, video | Submitted by 10:00 PST |
 

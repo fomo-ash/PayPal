@@ -1,7 +1,7 @@
 # Use the project virtualenv when it exists, so `make` never picks up a global Python.
 PY := $(if $(wildcard .venv/bin/python),.venv/bin/python,python)
 
-.PHONY: install test lint fmt api worker beat mcp spike e2b env services bench bench-ai secrets migrate local demo
+.PHONY: install test lint fmt api worker beat mcp spike e2b env services bench bench-ai secrets agent cheat migrate local demo
 
 install:
 	uv pip install -e ".[dev]"
@@ -44,6 +44,12 @@ beat:
 
 mcp:
 	$(PY) -m verdict.mcp.server
+
+agent:
+	$(PY) agents/honest_agent.py $(JOB)
+
+cheat:
+	$(PY) agents/cheat_agent.py $(if $(filter cheat_%,$(SUB)),$(SUB),cheat_memorizer) $(JOB)
 
 env:
 	$(PY) scripts/check_env.py

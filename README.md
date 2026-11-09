@@ -234,8 +234,8 @@ ngrok http 8000                 # public URL for PayPal webhooks
 | 1 | Nov 1–2 | Risk spikes: PayPal flow end to end in sandbox, E2B harness | ✅ PayPal spike 6/6 · E2B live: 18/18 in ~3.5s, network blocked |
 | 2 | Nov 3–5 | DB, state machine wired to the API, outbox + money worker, grading pipeline, fresh inputs | ✅ API: post → suite → validate → fund → claim → submit → grade → capture/void → payout → code; buyer code sandboxed too; webhooks verified + deduped |
 | 3 | Nov 6–9 | Scanner, policy engine wiring, AI judge, description check | ✅ AI spec check blocks unfair tests · AI review before settle (can only send to a person) · admin review queue · time-bomb cheat caught only by the AI (`make bench-ai`) |
-| 4 | Nov 9–10 | Web UI, Log in with PayPal, receipts, review queue page | ⏳ |
-| 5 | Nov 10 | MCP + agent demo, dispute evidence, deploy | ⏳ |
+| 4 | Nov 9–10 | Web UI, Log in with PayPal, receipts, review queue page | 🟡 backend ✅: Log in with PayPal (signed sessions), Ed25519 receipts + public verify, CORS, admin review API · web UI in progress · landing page in `scrollcraft/builds/verdict` |
+| 5 | Nov 10 | MCP + agent demo, dispute evidence, deploy | 🟡 MCP server + agent keys ✅ · honest LLM agent scored 100% live, memorizer agent voided · deploy pending |
 | 6 | Nov 11–12 | Benchmark, end-to-end tests, video, submit by **Nov 12 10:00 PST** | ⏳ |
 
 Day-by-day plan, owners and cut list: [`docs/ROADMAP.md`](docs/ROADMAP.md).
