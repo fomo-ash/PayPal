@@ -239,6 +239,7 @@ ngrok http 8000                 # public URL for PayPal webhooks
 | 6 | Nov 11–12 | Benchmark, end-to-end tests, video, submit by **Nov 12 10:00 PST** | ⏳ |
 
 Day-by-day plan, owners and cut list: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Deploy (free Render web service + Postgres) and webhook setup: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## 11. Documentation index
 

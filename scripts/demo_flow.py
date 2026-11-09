@@ -11,6 +11,7 @@ You approve the payment in the browser as the sandbox BUYER, like in the spike.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import webbrowser
@@ -21,7 +22,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from verdict.config import get_settings  # noqa: E402
 
-API = "http://localhost:8000"
+API = os.environ.get("VERDICT_API_URL", "http://localhost:8000").rstrip("/")
 TASK = Path(__file__).resolve().parents[1] / "bench" / "tasks" / "log_parser"
 DONE = {"PAID", "CODE_RELEASED", "VOIDED", "HUMAN_REVIEW", "PAYOUT_FAILED"}
 
