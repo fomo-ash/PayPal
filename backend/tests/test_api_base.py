@@ -22,11 +22,11 @@ def test_dev_auth_refused_with_live_paypal(api, user):
 
 
 def test_cors_allows_the_web_app_only(api):
-    ok = api.options("/jobs", headers={"Origin": "http://localhost:3000",
+    ok = api.options("/jobs", headers={"Origin": "http://localhost:5180",
                                        "Access-Control-Request-Method": "POST",
                                        "Access-Control-Request-Headers": "authorization"})
     assert ok.status_code == 200
-    assert ok.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert ok.headers["access-control-allow-origin"] == "http://localhost:5180"
     bad = api.options("/jobs", headers={"Origin": "https://evil.example",
                                         "Access-Control-Request-Method": "POST"})
     assert "access-control-allow-origin" not in bad.headers

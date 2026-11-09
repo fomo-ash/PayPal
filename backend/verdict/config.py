@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = "gemini-flash-latest"
 
-    cors_origins: str = "http://localhost:3000"   # web origins allowed to call the API (comma list)
+    cors_origins: str = "http://localhost:5180,http://127.0.0.1:5180"  # web origins (comma list)
     session_secret: str = ""                  # signs login sessions; scripts/gen_secrets.py
     inline_worker: bool = False               # `make local`: grade + pay in-process, no Redis
     dev_auth: bool = True                     # X-User-Id header login; never with live

@@ -6,7 +6,7 @@ Vite + React + TypeScript, built to static files and served by Render (`verdict-
 ```bash
 cd apps/web
 npm install
-npm run dev            # http://localhost:3000, calls the API at http://localhost:8000
+npm run dev            # http://localhost:5180, calls the API at http://localhost:8000
 VITE_API_URL=https://verdict-api-zyaa.onrender.com npm run dev   # against the hosted API
 npm run build          # → dist/
 ```
@@ -55,4 +55,4 @@ real job and play an honest or cheating worker without writing code.
 | `/verify` | `POST /receipts/verify` `{receipt, signature}`, `GET /receipts/public-key` (no login) |
 | settings | `POST /agents` (shows the key once), `GET /agents` |
 
-CORS allows `CORS_ORIGINS` (default `http://localhost:3000`). Full schemas: `http://localhost:8000/docs`.
+CORS allows `CORS_ORIGINS` (default `http://localhost:5180`). Full schemas: `http://localhost:8000/docs`.

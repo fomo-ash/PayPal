@@ -30,7 +30,7 @@ LOCAL_DB := sqlite:///data/verdict.db
 local:
 	mkdir -p data
 	DATABASE_URL=$(LOCAL_DB) $(PY) -m alembic -x url=$(LOCAL_DB) upgrade head
-	DATABASE_URL=$(LOCAL_DB) INLINE_WORKER=true $(PY) -m uvicorn verdict.api.main:app --port 8000 --app-dir backend
+	DATABASE_URL=$(LOCAL_DB) INLINE_WORKER=true DEMO_LOGIN=true $(PY) -m uvicorn verdict.api.main:app --port 8000 --app-dir backend
 
 SUB ?= honest_full
 demo:
