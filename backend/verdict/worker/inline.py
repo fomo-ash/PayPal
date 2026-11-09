@@ -1,6 +1,7 @@
-"""LOCAL DEMO ONLY (`make local`, INLINE_WORKER=true): grade and settle in a background
-thread of the API process, so the whole flow runs on one laptop without Redis or Celery.
-Production uses the Celery tasks in worker/tasks.py; the logic called here is the same.
+"""Single-process mode (INLINE_WORKER=true): grade and settle in background threads of the API
+process, and run the beat schedule on a ticker thread, so the whole product runs without Redis
+or Celery: `make local`, and a one-service deploy. The Celery tasks in worker/tasks.py call the
+same functions; everything here is safe to run twice because state moves are compare-and-set.
 """
 
 from __future__ import annotations
@@ -68,3 +69,48 @@ def _guarded(fn: Any, svc: Any, arg: uuid.UUID) -> None:
         fn(svc, arg)
     except Exception:
         log.exception("inline worker failed for %s", arg)
+
+
+# ── single-process timers: the Celery beat schedule, for hosts that run only the API ──
+SCHEDULE = (("outbox", 30), ("claims", 60), ("holds", 600), ("stale", 300))
+
+
+def tick(svc: Any, due: set[str]) -> dict[str, int]:
+    """Run the named jobs once. Each one is safe to run twice or concurrently."""
+    from verdict.worker import timers
+
+    done: dict[str, int] = {}
+    if "outbox" in due and svc.paypal is not None:
+        done["outbox"] = len(money.process_outbox(svc.Session, svc.paypal))
+    if "claims" in due:
+        done["claims"] = timers.expire_claims(svc.Session)
+    if "holds" in due:
+        done["holds"] = timers.expire_holds(svc.Session)
+    if "stale" in due:
+        stale = grading.stale_submissions(svc.Session)
+        for sid in stale:
+            start(svc, sid)
+        done["stale"] = len(stale)
+    return done
+
+
+def start_ticker(svc: Any, period: float = 5.0) -> threading.Thread:
+    def loop() -> None:
+        last = {name: 0.0 for name, _ in SCHEDULE}
+        while True:
+            now = time.monotonic()
+            due = {n for n, every in SCHEDULE if now - last[n] >= every}
+            if due:
+                try:
+                    out = tick(svc, due)
+                    if any(out.values()):
+                        log.warning("ticker %s", out)
+                except Exception:
+                    log.exception("ticker failed")
+                for n in due:
+                    last[n] = now
+            time.sleep(period)
+
+    t = threading.Thread(target=loop, daemon=True, name="inline-ticker")
+    t.start()
+    return t

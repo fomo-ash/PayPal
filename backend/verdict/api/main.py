@@ -94,9 +94,10 @@ def default_services(cfg: Settings) -> Services:
                    runner=make_runner(cfg), enqueue_grading=enqueue_grading,
                    llm=optional_client(cfg), kick_money=kick_money)
     if cfg.inline_worker:
-        from verdict.worker.inline import start, start_money
+        from verdict.worker.inline import start, start_money, start_ticker
         svc.enqueue_grading = lambda submission_id: start(svc, submission_id)
         svc.kick_money = lambda job_id: start_money(svc, job_id)
+        start_ticker(svc)          # the beat schedule, in-process (no Celery, no Redis)
     return svc
 
 
