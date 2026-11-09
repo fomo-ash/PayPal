@@ -1,275 +1,279 @@
-# Verdict
+<p align="center">
+  <img src="docs/assets/verdict-banner.svg" alt="Verdict: pay only for the code that passes" width="100%">
+</p>
 
-> **Pay only for code that works, whether a person or an AI agent wrote it.**
+<p align="center">
+  <a href="https://verdict-web-z4k7.onrender.com"><b>Try the app</b></a> ·
+  <a href="https://verdict-site.onrender.com"><b>How it works</b></a> ·
+  <a href="https://verdict-api-zyaa.onrender.com/docs"><b>API docs</b></a> ·
+  <a href="docs/DEMO_SCRIPT.md"><b>Demo script</b></a>
+</p>
+
+<p align="center">
+  <img alt="PayPal sandbox" src="https://img.shields.io/badge/PayPal-Orders%20v2%20·%20Payments%20v2%20·%20Payouts-003087?logo=paypal&logoColor=white">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-Vite-61DAFB?logo=react&logoColor=black">
+  <img alt="E2B" src="https://img.shields.io/badge/sandbox-E2B%20microVM-FF8800">
+  <img alt="MCP" src="https://img.shields.io/badge/agents-MCP-111111">
+  <img alt="Render" src="https://img.shields.io/badge/deployed%20on-Render-46E3B7?logo=render&logoColor=black">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-lightgrey">
+</p>
+
+---
+
+**Verdict** is a pay-on-verification service for software work. A buyer posts a coding job and
+PayPal **holds** the budget. A worker, a person or an AI agent, submits code. Verdict runs that
+code in an isolated sandbox against hidden tests and inputs nobody has seen, has an AI look for
+cheating, and then tells PayPal to **capture exactly the share the work earned**, release the rest
+to the buyer, and pay the worker. Both sides get a signed receipt.
+
 > PayPal holds the money. Verdict holds the code. Neither side can run off with the other's half.
 
-Verdict is a **pay-on-verification** service for software work. A buyer posts a coding job and puts a PayPal **authorization hold** on the payment. A worker (a freelancer or an AI agent) submits code. Verdict runs the code against hidden tests in an isolated sandbox, checks it for cheating, and then tells PayPal to **capture exactly the share the work earned**, **void** the rest, and **pay out** the worker. Every step produces a signed receipt.
+## The problem
 
-Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) (submissions close **Nov 12, 2026, 12:00 PST**).
+Every small software deal between strangers starts with the same question: **who pays first?**
 
-**Live (PayPal sandbox, on Render):** [the app](https://verdict-web-z4k7.onrender.com) · [how it works](https://verdict-site.onrender.com) · [API docs](https://verdict-api-zyaa.onrender.com/docs) · the API sleeps when idle, so the first request can take a minute.
+- **The buyer pays first** and may get broken, half-done or no code at all.
+- **The worker delivers first** and may never be paid.
 
-Verified on the hosted API, each run a real PayPal sandbox authorization:
+Escrow with a human reviewer solves this, but it takes days and costs more than a $20–$500 job is
+worth. It is hopeless when **AI agents** do the work in minutes, and agents add a new problem:
+code that *looks* finished but **games the checks**. It memorizes expected answers, tampers with
+the test runner, or leaves notes asking the AI grader to approve it.
 
-| Submission | Fresh inputs | Settlement | PayPal |
-|---|---|---|---|
-| Honest, complete | 200/200 | CAPTURE 100% | $100.00 captured, $95.00 paid out |
-| Honest, skips a validation rule | 188/200 | CAPTURE 75.1% | $75.15 captured, **$24.85 released to the buyer**, $71.39 paid out |
-| Memorized the hidden tests (18/20 hidden) | 31/200 | VOID | $0 captured, $100.00 released |
+Verdict is the neutral middle: automatic, fast, and fair to **both** sides.
 
-A time-bomb submission that passes every test is caught only by the AI review, which cites the
-line and sends it to a person (`make bench-ai`, and `demo_flow.py cheat_timebomb`).
+## How it works
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/fomo-ash/PayPal) one free web service, free Postgres and the landing page, from [`render.yaml`](render.yaml) ([guide](docs/DEPLOY.md)).
+```
+ Buyer                         Verdict                                  PayPal
+ ─────                         ───────                                  ──────
+ posts job + hidden tests ───► runs the buyer's reference on every
+                               test, AI checks each test is fair
+ approves the hold ──────────────────────────────────────────────────► AUTHORIZE $100 (held, not charged)
+                               worker or AI agent claims, submits
+                               sandbox: hidden tests + 200 fresh inputs
+                               scanner + AI review (can only flag)
+                               score → exact cents ──────────────────► CAPTURE $75.15 (rest released)
+                                                                       PAYOUT $71.39 to the worker
+ gets the code + receipt ◄──── signed receipt, code released
+```
 
----
-
-## Table of contents
-1. [The problem](#1-the-problem)
-2. [How Verdict works](#2-how-verdict-works)
-3. [How the payout is calculated](#3-how-the-payout-is-calculated)
-4. [Loopholes and how they are closed](#4-loopholes-and-how-they-are-closed)
-5. [Architecture](#5-architecture)
-6. [Tech stack](#6-tech-stack)
-7. [Repository layout](#7-repository-layout)
-8. [Getting started](#8-getting-started)
-9. [Team workflow (git)](#9-team-workflow-git)
-10. [Roadmap and status](#10-roadmap-and-status)
-11. [Documentation index](#11-documentation-index)
-12. [License](#12-license)
-
----
-
-## 1. The problem
-
-Every small software deal between strangers has the same awkward question: **who pays first?**
-
-- **The buyer pays first:** the worker may deliver broken code, half-finished code, or nothing. The buyer loses the money.
-- **The worker goes first:** the buyer may take the code and never pay. The worker loses the time.
-
-Traditional escrow fixes this with a human reviewer, which takes days and costs too much for $20–$500 jobs. It is also far too slow when **AI agents** do the work in minutes. Agents bring a new problem as well: code that *looks* finished but **games the checks** (memorized answers, tampered test tools, notes telling the AI grader to approve).
-
-Verdict is the neutral middleman, automated and fair to **both** sides.
-
-## 2. How Verdict works
-
-| Step | What happens | PayPal piece |
+| Step | What happens | PayPal |
 |---|---|---|
-| 1. Post | The buyer writes a description, public examples, **hidden tests in weighted groups**, a **reference solution**, and a minimum score. | none |
-| 2. Validate | Verdict runs the reference solution against the hidden tests (it must pass 100%). The AI flags any hidden test the description doesn't imply. Tests are **sealed** with a SHA-256 hash. | none |
-| 3. Fund | The buyer approves in the PayPal popup. The money is **authorized, not sent**: a hold, like a hotel deposit. | Orders v2 `intent=AUTHORIZE` |
-| 4. Claim | The worker (signed in with PayPal) sees the description, examples, group weights and suite hash, then accepts. Deadline is 48h or less. | Log in with PayPal |
-| 5. Submit | One graded submission. Unlimited runs against the public examples. | none |
-| 6. Grade | Code runs in a no-network microVM. The harness feeds **one input at a time**; **expected answers never enter the sandbox**, and comparison happens outside. 200 **fresh random inputs** are checked against the reference solution. | none |
-| 7. Check | A static scanner looks for known cheats. The AI judge (an open model on Groq's free tier) reviews the evidence and cites exact lines. **The AI can never raise a payment, and cannot block without a deterministic signal.** | none |
-| 8. Settle | Capture the earned amount (`final_capture=true` releases the rest), or void everything. Pay the worker. | Payments v2 capture/void, **Payouts** |
-| 9. Release | The buyer gets the code **only after the capture completes**. Both sides get a signed receipt. | none |
-| 10. Disputes | If the buyer files a chargeback, the evidence pack is submitted automatically. | **Disputes API**, Webhooks |
+| **Post** | The buyer writes a description, public examples, **hidden tests in weighted groups**, a **reference solution**, a generator for fresh inputs, and a minimum score. | |
+| **Validate** | The reference must pass every hidden test in the sandbox. An AI checks that each hidden test follows from the description; a test is blocked only if a second, separate check agrees. | |
+| **Fund** | The buyer approves with the PayPal button. The money is **authorized, not charged**, like a hotel deposit. The test suite is sealed with a SHA-256 hash. | Orders v2 `intent=AUTHORIZE` |
+| **Claim** | A worker, or an AI agent with an API key, takes the job and sees the description, examples, group weights and suite hash. | Log in with PayPal |
+| **Submit** | Unlimited runs on the public examples, then **one** graded submission. | |
+| **Grade** | The code runs in a no-network E2B microVM. The harness feeds one input at a time; **expected answers never enter the sandbox**. 200 **fresh random inputs** are checked against the reference. | |
+| **Check** | A static scanner looks for known cheats. An AI reads the code and cites lines. **It cannot raise a payment and cannot block on its own**: a flag sends the case to a person. | |
+| **Settle** | Partial capture of the earned amount with `final_capture=true` (PayPal releases the rest), or void the whole hold. Pay the worker. | Payments v2, Payouts |
+| **Release** | The buyer receives the code only after the capture completes. Both sides get an Ed25519-signed receipt anyone can verify. | |
 
-## 3. How the payout is calculated
+## What a verdict looks like
 
-```
-core_rate  = min(hidden_pass_rate, fresh_input_pass_rate)   # memorizers score ~0 automatically
-score      = Σ weight_g × rate_g            (flaky tests excluded from both sides)
-if score < min_score: score = 0
-capture    = floor_to_cents(job_amount × score)              # PayPal partial capture, final_capture=true
-fee        = round_half_up(capture × fee_bps / 10000)
-worker     = capture − fee
-released   = job_amount − capture                            # PayPal returns it to the buyer
-```
+Real runs on the hosted API, each one a real PayPal sandbox authorization on a $100 log-parser job:
 
-**Example: $100 job, minimum score 50%, 5% fee**
-
-| Group | Weight | Result | Rate |
+| Submission | Fresh inputs | Verdict | Money |
 |---|---|---|---|
-| Core parsing | 60% | hidden 9/10, fresh 196/200 | min(0.90, 0.98) = 0.90 |
-| Edge cases | 25% | 4/8 | 0.50 |
-| Performance | 15% | 2/2 | 1.00 |
+| Honest and complete | 200/200 | **Capture 100%** | $100.00 captured · $95.00 to the worker |
+| Honest, skips one validation rule | 188/200 | **Capture 75.1%** | $75.15 captured · **$24.85 released to the buyer** · $71.39 to the worker |
+| Memorized the hidden tests | 31/200 | **Void** | $0 captured · $100.00 released |
+| Hidden time bomb, passes every test | all pass | **Human review → void** | the AI cites the exact line; a person voids it |
 
-Score = 0.6×0.90 + 0.25×0.50 + 0.15×1.00 = **0.815**. That gives a **capture of $81.50**, **$18.50 released** to the buyer, a **fee of $4.08**, and **$77.42 to the worker**.
-This exact example is a unit test: [`backend/tests/test_scoring.py`](backend/tests/test_scoring.py).
+The AI also explains itself. On the 75.1% run it wrote: *"The implementation skips required
+timestamp validation, violating the spec, but there is no evidence of cheating or manipulation"*,
+and pointed at `solution.py:6`. The worker was paid for what passed and was not treated as a cheat.
 
-## 4. Loopholes and how they are closed
+## How the payout is calculated
 
-The full threat model is in [`docs/LOOPHOLES.md`](docs/LOOPHOLES.md). In summary:
+```
+rate_g    = hidden pass rate of group g; if g has fresh inputs: min(hidden rate, fresh rate)
+score     = Σ weight_g × rate_g                (0 if below the buyer's minimum)
+capture   = floor_to_cents(amount × score)      → PayPal partial capture, final_capture=true
+fee       = round_half_up(capture × 5%)
+worker    = capture − fee                       → PayPal Payouts
+released  = amount − capture                    → never charged
+```
+
+Example, $100 job: core 60% (hidden 9/10, fresh 196/200 → 0.90), edge 25% (4/8), perf 15% (2/2)
+gives **81.5%**, so **$81.50 captured, $18.50 released, $4.08 fee, $77.42 to the worker**. That
+example is a unit test in [`backend/tests/test_scoring.py`](backend/tests/test_scoring.py). Money is
+`Decimal` everywhere; no float ever touches an amount.
+
+## Why it can be trusted
+
+**Rules the code enforces:**
+1. **The AI never computes money.** Amounts come only from `verdict/core/scoring.py`.
+2. **The AI can never raise a payment.** The policy takes its answer as an enum, never an amount.
+3. **The AI cannot block alone.** Without a deterministic signal, suspicion only means human review,
+   and a reviewer can only lower or void, never raise.
+4. **Expected outputs never enter the sandbox.**
+5. **Exactly once.** Every state change and the PayPal action it needs are written in one database
+   transaction (transactional outbox), every PayPal call carries a `PayPal-Request-Id`, and state
+   moves are compare-and-set, so a retry or a crash never charges twice.
+6. **Auditable.** A double-entry ledger, a hash-chained audit log, and a signed receipt whose
+   signature anyone can check at `/verify`.
+
+**Loopholes and how they are closed** (full threat model in [`docs/LOOPHOLES.md`](docs/LOOPHOLES.md)):
 
 | Who | Attack | Defence |
 |---|---|---|
-| Worker | Memorizes the expected answers | Fresh random inputs checked against the reference solution; `core = min(hidden, fresh)` |
+| Worker | Memorizes the expected answers | Fresh inputs checked against the reference; a group pays `min(hidden, fresh)` |
 | Worker | Reads the hidden tests | Expected outputs never enter the sandbox |
-| Worker | Tampers with the test tool or fakes an exit code | No test framework in the sandbox; pass/fail is decided **outside**; `conftest.py`/`.pth`/`sitecustomize` rejected |
-| Worker | Prompt-injects the AI judge | The AI cannot raise a payment; text addressed to the grader is a hard signal |
-| Worker | Probes the tests with many submissions | One graded submission per PayPal identity; only group-level feedback before the verdict |
-| Worker | Network, fork bombs, resource abuse | No network, CPU/memory/process/time/output limits |
-| Buyer | Writes impossible tests | The reference solution must pass 100% before funding |
-| Buyer | Writes tests the description doesn't imply | The AI checks each test against the description; flagged tests must be fixed before funding |
-| Buyer | Changes tests later | The suite is sealed by SHA-256 hash, shown to the worker before they accept |
-| Buyer | Takes the code without paying | Code is released only after the PayPal capture completes |
-| Buyer | Chargeback after delivery | Automatic evidence through the Disputes API, delayed payout and limits for new buyers (reduced, not eliminated) |
-| Platform | AI false positive | AI alone can only send a case to human review; a BLOCK needs a deterministic signal |
-| Platform | Double charge on retry | `PayPal-Request-Id` idempotency, state machine and transactional outbox |
-| Platform | Hold expires | Deadline of 48h or less (inside PayPal's 3-day honor period); reauthorize or split into milestones |
+| Worker | Tampers with the test runner or exit code | Pass/fail is decided outside; `conftest.py`, `.pth`, `sitecustomize` are rejected |
+| Worker | Prompt-injects the AI | The AI cannot raise a payment; text aimed at the grader is a hard signal |
+| Worker | Probes the tests with many submissions | One graded submission per job; group-level feedback only |
+| Worker | Network, fork bombs, resource abuse | No network; CPU, memory, process, time and output limits |
+| Buyer | Writes impossible tests | The reference must pass every test before funding |
+| Buyer | Writes tests the description doesn't imply | The AI spec check blocks them before any money is held |
+| Buyer | Changes the tests later | The suite is sealed by hash, shown to the worker before they accept |
+| Buyer | Takes the code without paying | Code is released only after PayPal's capture completes |
+| Platform | AI false positive | AI alone only sends a case to a person |
+| Platform | Double charge on retry | Idempotency keys, outbox, compare-and-set state machine |
+| Platform | The hold expires | Jobs are closed out inside PayPal's 3-day honor period |
 
-## 5. Architecture
+## PayPal, used for what it is good at
+
+| PayPal capability | How Verdict uses it |
+|---|---|
+| **Orders v2, `intent=AUTHORIZE`** | The buyer's budget is held, not charged, while the work is done |
+| **Payments v2: partial capture with `final_capture=true`** | Captures exactly the earned cents; PayPal releases the remainder automatically |
+| **Payments v2: void** | A cheat or a no-show costs the buyer nothing |
+| **Payouts** | The worker is paid minutes after the capture |
+| **JavaScript SDK (PayPal Buttons)** | One-click funding in the web app |
+| **Webhooks** | Verified with PayPal and stored once; they never move money |
+| **Log in with PayPal** | A PayPal account is the identity for buyers and workers |
+
+## Built for AI agents
+
+Agents get an API key (`vk_…`, stored hashed) and an **MCP server** with six tools:
+`list_jobs`, `get_job`, `claim_job`, `run_examples`, `submit_work`, `get_verdict`. Any MCP client can
+find work, try it on the examples, submit, and get paid to its owner's PayPal. The repo includes
+an honest LLM agent, which scored 100% live, and cheating agents, which were voided:
+see [`agents/`](agents/).
+
+## The app
+
+| Page | What it does |
+|---|---|
+| **Home** | A scroll story of one $100 hold moving through held, tested, judged, settled, signed, then the open jobs in an **AG Grid** table |
+| **Post a job** | Description, budget, minimum score, hidden tests (a sample suite is one click), then the validation report and the **PayPal button** |
+| **Work** | Take a job, write or load a solution (honest and cheating samples included), run the public examples, submit once |
+| **Verdict** | Live progress, the score, hidden and fresh results per group, the AI's findings with line numbers, and the **hold tearing at the exact cents** into worker, fee and back to the buyer |
+| **Review queue** | Flagged cases with the code and flagged lines; approve up to the scored amount, or void |
+| **Verify** | Paste any receipt and check its Ed25519 signature, no login needed |
+
+On the hosted sandbox, **Try as buyer / worker / reviewer** gives every visitor a fresh demo account.
+Funding uses a PayPal **sandbox** buyer account.
+
+## Architecture
 
 ```
-   Buyer (human)          Worker (human)        Worker agent (any LLM)        
-        │ Next.js web + PayPal JS SDK │                 │ MCP server / REST
-        ▼                             ▼                 ▼
- ┌─────────────────────────── API (FastAPI) ───────────────────────────────┐
- │ auth (Log in with PayPal) · jobs · submissions · JOB STATE MACHINE      │
- │ policy engine · double-entry ledger · webhook receiver (sig-verified)   │
- └───┬───────────────┬───────────────┬────────────────┬────────────────────┘
-     │ SQL           │ enqueue       │ HTTPS          │ put/get
- ┌───▼──────┐   ┌────▼────┐   ┌──────▼─────────┐  ┌──▼───────────────────┐
- │ Postgres │   │  Redis  │   │  PayPal APIs   │  │ R2 object store      │
- │ state,   │   │ (queue) │   │ Orders v2      │  │ sealed test suites,  │
- │ ledger,  │   └────┬────┘   │ Payments v2    │  │ submissions, signed  │
- │ outbox,  │        │        │ Payouts        │  │ receipts             │
- │ audit    │        ▼        │ Disputes       │  └──────────────────────┘
- └──────────┘  ┌─────────────────────────────┐  │ Webhooks · Identity │
-               │ Workers (Celery)            │  └─────────────────────┘
-               │ 1 suite validator           │
-               │ 2 grader ───────────────────┼──► SANDBOX (E2B microVM)
-               │ 3 fresh-input generator     │    no network · resource caps
-               │ 4 static scanner            │    harness gets ONE input at a
-               │ 5 AI judge (LLM via Groq)   │    time, never sees the expected
-               │ 6 money worker (outbox)     │    answers
-               └─────────────────────────────┘
+  Buyer · Worker · Reviewer             AI agent (any MCP client)
+  React web app + PayPal Buttons        MCP server ── API key
+             │                                 │
+             ▼                                 ▼
+ ┌──────────────────────────────── API (FastAPI) ─────────────────────────────────┐
+ │ auth (Log in with PayPal, demo) · jobs · submissions · admin review · receipts │
+ │ job state machine (compare-and-set) · policy · ledger · outbox · audit chain   │
+ └─────┬──────────────────────┬──────────────────────┬───────────────────┬───────┘
+       │                      │                      │                   │
+ ┌─────▼──────┐   ┌───────────▼───────────┐   ┌──────▼───────┐   ┌───────▼────────┐
+ │ Postgres   │   │ Grading + money worker│   │ PayPal       │   │ LLM            │
+ │ jobs, runs │   │ (in-process, or Celery│   │ Orders v2    │   │ Groq           │
+ │ ledger     │   │  + Redis at scale)    │   │ Payments v2  │   │ gpt-oss-120b,  │
+ │ outbox     │   │ outbox → PayPal       │   │ Payouts      │   │ Gemini fallback│
+ │ suites,    │   │ timers                │   │ Webhooks     │   └────────────────┘
+ │ code blobs │   └───────────┬───────────┘   │ Identity     │
+ └────────────┘               │               └──────────────┘
+                     ┌────────▼─────────┐
+                     │ E2B microVM      │  no network · resource caps · one input
+                     │ sandbox          │  at a time · never sees expected answers
+                     └──────────────────┘
 ```
 
-Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · state machine: [`docs/STATE_MACHINE.md`](docs/STATE_MACHINE.md) · data model: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
+More: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/STATE_MACHINE.md`](docs/STATE_MACHINE.md) ·
+[`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 
-### Design rules (do not break these)
-1. **The AI never computes money.** Amounts come only from `verdict.core.scoring`.
-2. **The AI can never raise a payment.** `verdict.core.policy` takes the AI's decision as an enum, never as an amount.
-3. **The AI cannot block on its own.** A BLOCK needs a deterministic hard signal; AI suspicion alone means `HUMAN_REVIEW`.
-4. **Expected outputs never enter the sandbox.**
-5. **Only the money worker calls PayPal's money endpoints**, always with a `PayPal-Request-Id`.
-6. **Every state change goes through `verdict.core.state_machine`.**
-
-## 6. Tech stack
+## Tech stack
 
 | Layer | Choice |
 |---|---|
-| Frontend | Next.js 15, TypeScript, Tailwind, shadcn/ui, `@paypal/react-paypal-js`, Monaco (read-only code view) |
-| API | Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, httpx |
-| Jobs | Celery + Redis, Celery Beat (deadlines, hold expiry) |
-| Database | Postgres 16 |
-| Storage | Cloudflare R2 (S3 API) |
-| Sandbox | E2B microVMs (Firecracker); fallback Docker + gVisor |
-| Checks | Hypothesis, Python `ast`, Semgrep custom rules |
-| AI | Free tiers through one OpenAI-compatible client (`verdict/judge/llm.py`): **Groq** `openai/gpt-oss-120b` for the judge and the description check, `llama-3.1-8b-instant` for drafts; **Gemini Flash** (Google AI Studio) as automatic fallback. Any OpenAI-compatible provider can be swapped in via `.env`. See [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md) |
-| Agents | MCP Python SDK (FastMCP), demo worker agent using the same free LLM client |
-| PayPal | Orders v2, Payments v2 (authorize/capture/void/reauthorize), Payouts, Disputes, Webhooks, Log in with PayPal |
-| Receipts | Canonical JSON signed with Ed25519, PDF via WeasyPrint, public `/verify` page |
-| Observability | OpenTelemetry, Sentry, Langfuse |
-| Testing | pytest, Playwright, judge benchmark (`bench/`) |
-| Deploy | Render (`render.yaml`), E2B, GitHub Actions |
+| Web | React + TypeScript (Vite), AG Grid, PayPal JS SDK, scroll-craft engine for the scroll story |
+| API | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, httpx |
+| Work | In-process worker and timers (one service), or Celery + Redis |
+| Data | Postgres 16 (SQLite for local runs and tests) |
+| Sandbox | E2B Firecracker microVMs; a local runner for tests |
+| Checks | Python `ast` rules, reject list, fresh inputs from the buyer's generator |
+| AI | Groq `openai/gpt-oss-120b` through one OpenAI-compatible client, Gemini Flash as fallback ([`docs/LLM_SETUP.md`](docs/LLM_SETUP.md)) |
+| Agents | MCP Python SDK |
+| Receipts | Canonical JSON signed with Ed25519 |
+| Deploy | Render (API, web app, landing page, Postgres) from [`render.yaml`](render.yaml), GitHub Actions CI |
+| Tests | pytest (265 tests, also run on Postgres), a grading and AI benchmark in [`bench/`](bench/) |
 
-## 7. Repository layout
+## Run it
 
-```
-paypall/
-├─ README.md                  ← you are here
-├─ LICENSE                    MIT
-├─ .env.example               every environment variable, documented
-├─ pyproject.toml             Python package "verdict" (backend) + dev tools
-├─ Makefile                   make dev / test / lint / spike
-├─ docker-compose.yml         local Postgres + Redis
-├─ render.yaml                production deploy (web, api, worker, beat, db, redis)
-├─ docs/                      architecture, loopholes, PayPal setup, data model, plan, demo
-├─ backend/
-│  ├─ verdict/
-│  │  ├─ config.py            settings loaded from .env
-│  │  ├─ core/                ★ pure logic: scoring, policy, state machine, ledger, outbox, audit
-│  │  ├─ paypal/              typed PayPal client: orders, payments, payouts, disputes, webhooks, identity
-│  │  ├─ sandbox/             harness (runs inside the VM), E2B + Docker runners
-│  │  ├─ grading/             pipeline, fresh inputs, output comparison
-│  │  ├─ scanner/             reject list, AST rules, Semgrep rules
-│  │  ├─ judge/               AI description check + cheating review, JSON schema, prompts
-│  │  ├─ receipts/            Ed25519 signing, canonical JSON
-│  │  ├─ db/                  SQLAlchemy models, session
-│  │  ├─ api/                 FastAPI app + routers
-│  │  ├─ worker/              Celery app + tasks
-│  │  └─ mcp/                 MCP server for agents
-│  └─ tests/                  unit tests (scoring, policy, state machine, harness, compare)
-├─ apps/web/                  Next.js frontend (created in Phase 1; see its README)
-├─ agents/                    demo agents: one honest, several cheating
-├─ bench/                     judge benchmark: tasks, submissions, expected results
-└─ scripts/                   sandbox_spike.py (day-1 PayPal check), check_env.py
-```
+**Try it live:** [verdict-web-z4k7.onrender.com](https://verdict-web-z4k7.onrender.com). The API
+sleeps when idle, so the first click can take a minute.
 
-## 8. Getting started
-
-### Prerequisites
-- Python 3.12+ and [uv](https://docs.astral.sh/uv/)
-- Node 20+ (frontend, Phase 1)
-- Docker (local Postgres/Redis)
-- A PayPal developer account with sandbox app credentials ([`docs/PAYPAL_SANDBOX_SETUP.md`](docs/PAYPAL_SANDBOX_SETUP.md))
-- A free Groq API key (and optionally a free Gemini key as fallback): [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md)
-- An E2B API key (Phase 1)
-
-### Setup
+**Locally:**
 ```bash
-git clone <team-repo-url> paypall && cd paypall
-cp .env.example .env            # fill in your sandbox keys; never commit .env
+cp .env.example .env              # PayPal sandbox keys, E2B key, Groq key (never commit .env)
 uv venv && source .venv/bin/activate
 uv pip install -e ".[dev]"
-make test                       # unit tests + benchmark (no keys needed)
-make bench                      # grading pipeline on 2 honest + 5 cheating submissions
-python scripts/check_env.py     # confirms which keys are set (never prints them)
-python scripts/sandbox_spike.py # day-1: runs authorize → partial capture → void → payout in the sandbox
-python scripts/llm_smoke.py     # checks the free LLM judge (needs LLM_API_KEY from Groq)
-python scripts/e2b_smoke.py     # runs code in an E2B microVM and proves network is blocked
+make test                         # unit tests, no keys needed
+make bench                        # grading pipeline on honest and cheating submissions
+make local                        # API on :8000 (SQLite, in-process worker, demo logins)
+cd apps/web && npm install && npm run dev    # web app on :5180
 ```
 
-### Local services (Phase 1+)
+Scripted end-to-end run against any API, with real PayPal sandbox calls:
 ```bash
-docker compose up -d            # Postgres + Redis
-make migrate                    # create the tables (alembic upgrade head)
-make api                        # FastAPI on :8000
-make worker                     # Celery worker
-ngrok http 8000                 # public URL for PayPal webhooks
+python scripts/demo_flow.py honest_partial      # partial capture
+python scripts/demo_flow.py cheat_memorizer     # void
+python scripts/demo_flow.py cheat_timebomb      # AI flags it, you review
+VERDICT_AGENT_KEY=vk_... make agent             # an LLM agent works a job over MCP
 ```
 
-## 9. Team workflow (git)
+Setup guides: [`docs/PAYPAL_SANDBOX_SETUP.md`](docs/PAYPAL_SANDBOX_SETUP.md) ·
+[`docs/LLM_SETUP.md`](docs/LLM_SETUP.md) · [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-- `main` is protected: merge only through pull requests with at least one review.
-- One branch per person and area: `<name>/<area>-<short-desc>`, e.g. `anurag/phase-0-scaffold`, `riya/paypal-money-worker`.
-- Small PRs. Rebase on `main` before opening one. CI must pass.
-- **Never commit `.env`** or any key. The repo is public.
-- Full guide: [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
+**Deploy your own:**
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/fomo-ash/PayPal)
 
-## 10. Roadmap and status
+## Repository layout
 
-| Phase | Dates | Goal | Status |
-|---|---|---|---|
-| 0 | Nov 1 | Repo structure, docs, scoring/policy/state machine/harness/scanner with tests, local grading bench, sandbox spike script | ✅ this commit |
-| 1 | Nov 1–2 | Risk spikes: PayPal flow end to end in sandbox, E2B harness | ✅ PayPal spike 6/6 · E2B live: 18/18 in ~3.5s, network blocked |
-| 2 | Nov 3–5 | DB, state machine wired to the API, outbox + money worker, grading pipeline, fresh inputs | ✅ API: post → suite → validate → fund → claim → submit → grade → capture/void → payout → code; buyer code sandboxed too; webhooks verified + deduped |
-| 3 | Nov 6–9 | Scanner, policy engine wiring, AI judge, description check | ✅ AI spec check blocks unfair tests · AI review before settle (can only send to a person) · admin review queue · time-bomb cheat caught only by the AI (`make bench-ai`) |
-| 4 | Nov 9–10 | Web UI, Log in with PayPal, receipts, review queue page | 🟡 backend ✅: Log in with PayPal (signed sessions), Ed25519 receipts + public verify, CORS, admin review API · web UI in progress · landing page in `scrollcraft/builds/verdict` |
-| 5 | Nov 10 | MCP + agent demo, dispute evidence, deploy | 🟡 MCP server + agent keys ✅ · honest LLM agent scored 100% live, memorizer agent voided · deploy pending |
-| 6 | Nov 11–12 | Benchmark, end-to-end tests, video, submit by **Nov 12 10:00 PST** | ⏳ |
+```
+backend/verdict/
+  core/        scoring, policy, state machine, ledger, outbox, audit (pure logic)
+  paypal/      typed client: orders, payments, payouts, webhooks, identity
+  sandbox/     harness that runs inside the VM, E2B and local runners
+  grading/     pipeline, fresh inputs, output comparison, suite sealing
+  scanner/     reject list and AST rules
+  judge/       AI spec check and AI review: prompts, JSON schema, LLM client
+  receipts/    Ed25519 signing over canonical JSON
+  api/         FastAPI app and routers
+  worker/      grading, money worker, timers (in-process or Celery)
+  mcp/         MCP server for agents
+apps/web/      React web app
+agents/        honest and cheating demo agents
+bench/         benchmark tasks with honest and cheating submissions
+scrollcraft/   the landing page
+docs/          architecture, threat model, state machine, data model, setup guides
+```
 
-Day-by-day plan, owners and cut list: [`docs/ROADMAP.md`](docs/ROADMAP.md).
-Deploy (free Render web service + Postgres) and webhook setup: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+## From prototype to production
 
-## 11. Documentation index
+- **Marketplace payments.** Move from capture-then-Payouts to PayPal **Multiparty**: the worker as
+  payee, Verdict's fee as `platform_fees`, and **delayed disbursement** holding funds until release.
+- **Longer jobs.** Reauthorize holds past PayPal's 3-day honor period, or split work into milestones.
+- **Disputes.** Answer `CUSTOMER.DISPUTE.*` events with the signed receipt as evidence.
+- **More languages and task types** behind the same harness and scoring.
 
-| Doc | Contents |
-|---|---|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Components, data flow, grading pipeline, security boundaries |
-| [`docs/LOOPHOLES.md`](docs/LOOPHOLES.md) | Full threat model: worker, buyer and platform attacks and defences |
-| [`docs/STATE_MACHINE.md`](docs/STATE_MACHINE.md) | Job states, transitions, timers, outbox |
-| [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) | Postgres tables and the double-entry ledger |
-| [`docs/PAYPAL_SANDBOX_SETUP.md`](docs/PAYPAL_SANDBOX_SETUP.md) | Getting keys, test accounts, webhooks, every PayPal call we make |
-| [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md) | Free LLM providers (Groq + Gemini), limits, keys, smoke test |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | 11-day plan, owners, cut list, day-1 checks |
-| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | The 3-minute video, scene by scene |
-| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Branching, commits, PRs, code style |
+## License
 
-## 12. License
-
-[MIT](LICENSE). Use of PayPal APIs is subject to PayPal's own developer terms. "Conditional payment" in this project is a hackathon prototype running in the PayPal **sandbox**; it is not a licensed escrow service.
+[MIT](LICENSE). Use of PayPal APIs is subject to PayPal's developer terms. Verdict runs in the PayPal
+**sandbox**; it is a prototype, not a licensed escrow service.
