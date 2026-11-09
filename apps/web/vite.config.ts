@@ -4,6 +4,6 @@ import { defineConfig } from "vite";
 // The sample task is read straight from bench/ at build time (?raw imports).
 export default defineConfig({
   plugins: [react()],
-  server: { fs: { allow: ["../.."] } },
+  server: { host: "127.0.0.1", port: 3000, strictPort: true, fs: { allow: ["../.."] } },
   build: { chunkSizeWarningLimit: 1500 },
 });
