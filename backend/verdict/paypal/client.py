@@ -49,6 +49,20 @@ class PayPalClient:
         self._token = _Token(body["access_token"], time.time() + int(body.get("expires_in", 300)))
         return self._token.value
 
+    # ── Log in with PayPal (the USER's token, not the app's) ──────────────────
+    def exchange_auth_code(self, code: str) -> dict:
+        r = self._http.post(f"{self._base}/v1/oauth2/token", auth=self._auth,
+                            data={"grant_type": "authorization_code", "code": code})
+        self._raise(r)
+        return r.json()
+
+    def userinfo(self, user_access_token: str) -> dict:
+        r = self._http.get(f"{self._base}/v1/identity/oauth2/userinfo",
+                           params={"schema": "paypalv1.1"},
+                           headers={"Authorization": f"Bearer {user_access_token}"})
+        self._raise(r)
+        return r.json()
+
     # ── low level ─────────────────────────────────────────────────────────────
     def request(self, method: str, path: str, *, json: Any = None,
                 idempotency_key: str | None = None, params: dict | None = None) -> Any:

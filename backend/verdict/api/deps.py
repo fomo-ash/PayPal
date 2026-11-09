@@ -3,8 +3,8 @@
 Services (session factory, blob store, PayPal client, sandbox runner, LLM, task queue) live on
 `app.state` so tests can build an app with fakes: `create_app(Services(...))`.
 
-Auth (until Log in with PayPal lands in Phase 4): DEV ONLY header `X-User-Id: <uuid>`.
-It is refused outright when PAYPAL_ENV=live.
+Auth: `Authorization: Bearer <token>` from Log in with PayPal (api/routers/auth.py).
+DEV ONLY fallback: header `X-User-Id: <uuid>`, refused when DEV_AUTH is off or PAYPAL_ENV=live.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from typing import Annotated, Any
 from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session, sessionmaker
 
+from verdict.api import sessions
 from verdict.config import Settings
 from verdict.db.models import User
 from verdict.sandbox.runner import Runner
@@ -51,7 +52,16 @@ def db(svc: Annotated[Services, Depends(services)]) -> Iterator[Session]:
 
 def current_user(s: Annotated[Session, Depends(db)],
                  svc: Annotated[Services, Depends(services)],
+                 authorization: Annotated[str | None, Header()] = None,
                  x_user_id: Annotated[str | None, Header()] = None) -> User:
+    if authorization:
+        scheme, _, token = authorization.partition(" ")
+        body = (sessions.read(svc.settings.session_secret, "session", token.strip())
+                if scheme.lower() == "bearer" else None)
+        user = s.get(User, uuid.UUID(body["u"])) if body else None
+        if user is None:
+            raise HTTPException(401, "session expired; log in with PayPal again")
+        return user
     if not svc.settings.dev_auth or svc.settings.paypal_env == "live":
         raise HTTPException(401, "login required")
     if not x_user_id:

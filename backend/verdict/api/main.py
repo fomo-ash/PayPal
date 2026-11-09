@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from verdict.api.deps import CurrentUser, Services
-from verdict.api.routers import admin, dev, jobs, receipts, submissions, webhooks
+from verdict.api.routers import admin, auth, dev, jobs, receipts, submissions, webhooks
 from verdict.config import Settings, get_settings
 from verdict.core.policy import ReviewError
 from verdict.core.state_machine import IllegalTransition
@@ -56,6 +56,7 @@ def create_app(services: Services | None = None) -> FastAPI:
     app.include_router(webhooks.router)
     app.include_router(admin.router)
     app.include_router(receipts.router)
+    app.include_router(auth.router)
     if app.state.services.settings.dev_auth:
         app.include_router(dev.router)
     return app
