@@ -16,8 +16,8 @@
 | 2 | 3 | Nov 3 | DB models + Alembic, state machine persisted, outbox + money worker (A, D) | Unit tests with PayPal mocked (respx) ✅ |
 | 2 | 4 | Nov 4 | Suite upload, seal hash, reference validation, grading via E2B (B) | A job graded through the API ✅ |
 | 2 | 5 | Nov 5 | Fresh-input generator acceptance, flaky handling in prod path, webhooks (A, B) | Memorizer voided via API ✅ (e2e test) |
-| 3 | 6 | Nov 6 | Semgrep rules, 3 more cheat agents, AI judge with JSON schema (C) | Judge cites lines; AI-alone → review |
-| 3 | 7 | Nov 7 | AI spec check (B2), Langfuse tracing, judge red-team (C) | Unfair test blocked before funding |
+| 3 | 6 | Nov 6 | Semgrep rules, 3 more cheat agents, AI judge with JSON schema (C) | Judge cites lines; AI-alone → review ✅ (done Nov 9; time-bomb cheat added, Semgrep cut) |
+| 3 | 7 | Nov 7 | AI spec check (B2), Langfuse tracing, judge red-team (C) | Unfair test blocked before funding ✅ · admin review API ✅ · Langfuse deferred |
 | 4 | 8 | Nov 8 | Web: post/fund (PayPal Buttons), browse/claim/submit, verdict page (D) | Full flow in the browser |
 | 4 | 9 | Nov 9 | Log in with PayPal, code release, signed receipt + `/verify`, admin review (A, D) | Every loophole has a working answer |
 | 5 | 10 | Nov 10 | MCP server + LLM worker agent, dispute evidence, deploy to Render (D, A) | Agent paid in the hosted demo |
