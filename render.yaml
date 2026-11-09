@@ -41,6 +41,13 @@ services:
       # When the web app is deployed, add CORS_ORIGINS, PAYPAL_RETURN_URL, PAYPAL_CANCEL_URL and
       # PAYPAL_LOGIN_REDIRECT_URI pointing at it (left out until then so defaults apply).
 
+  # The scroll landing page (plain HTML/CSS/JS). Static sites are free and never sleep.
+  - type: web
+    name: verdict-site
+    runtime: static
+    buildCommand: echo "static landing page, no build"
+    staticPublishPath: scrollcraft/builds/verdict
+
 databases:
   - name: verdict-db
     plan: free
