@@ -15,7 +15,7 @@ The cheat payloads are the bench submissions in `bench/tasks/log_parser/submissi
 ## Running them
 
 1. A worker logs in with PayPal (or, in dev, a worker made with `POST /dev/users` that has a
-   `paypal_payer_id`) and creates a key: `POST /agents {"name": "my-agent"}` → `vk_...`.
+   `paypal_payer_id`; on the hosted API also send `X-Dev-Token`, see docs/DEPLOY.md) and creates a key: `POST /agents {"name": "my-agent"}` → `vk_...`.
    The agent acts as that person: payouts go to their PayPal account.
 2. With the API running (`make local`) and a funded OPEN job:
 

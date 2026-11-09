@@ -24,9 +24,11 @@ services:
       - { key: BLOB_BACKEND, value: db }
       - { key: SANDBOX_BACKEND, value: e2b }
       - { key: PAYPAL_ENV, value: sandbox }
-      # true lets scripts use the X-User-Id dev header (sandbox only). Set false once the
-      # web app logs in with PayPal.
+      # true lets scripts use the X-User-Id dev header (sandbox only), but only with the
+      # X-Dev-Token header = DEV_AUTH_TOKEN, so nobody else can mint users or admins on the
+      # public URL. Set DEV_AUTH false once the web app logs in with PayPal.
       - { key: DEV_AUTH, value: "true" }
+      - { key: DEV_AUTH_TOKEN, generateValue: true }
       - { key: SESSION_SECRET, generateValue: true }
       - { key: PAYPAL_CLIENT_ID, sync: false }
       - { key: PAYPAL_SECRET, sync: false }

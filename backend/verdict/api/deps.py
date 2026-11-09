@@ -5,12 +5,17 @@ Services (session factory, blob store, PayPal client, sandbox runner, LLM, task 
 
 Auth: `Authorization: Bearer <token>` from Log in with PayPal (api/routers/auth.py).
 DEV ONLY fallback: header `X-User-Id: <uuid>`, refused when DEV_AUTH is off or PAYPAL_ENV=live.
+On a public deployment DEV_AUTH_TOKEN is set, and dev login also needs `X-Dev-Token: <token>`.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
+import threading
+import time
 import uuid
+from collections import defaultdict, deque
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Annotated, Any
@@ -37,6 +42,29 @@ class Services:
     llm: Any = None                               # judge.llm.LLMClient; None = AI not configured
     # run the outbox now for a job a reviewer just settled; the beat tick does it anyway
     kick_money: Callable[[uuid.UUID], None] = field(default=lambda job_id: None)
+    limiter: RateLimiter = field(default_factory=lambda: RateLimiter())
+
+
+class RateLimiter:
+    """In-process sliding window per (action, user). One web process on the free deploy, so
+    memory is enough; it resets on restart, which only ever loosens it."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self.clock = clock
+        self._hits: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def hit(self, action: str, who: str, limit: int, window_s: float = 3600) -> None:
+        now = self.clock()
+        with self._lock:
+            q = self._hits[(action, who)]
+            while q and q[0] <= now - window_s:
+                q.popleft()
+            if len(q) >= limit:
+                retry = int(q[0] + window_s - now) + 1
+                raise HTTPException(429, f"too many {action} calls; try again in {retry}s",
+                                    headers={"Retry-After": str(retry)})
+            q.append(now)
 
 
 def services(request: Request) -> Services:
@@ -55,7 +83,8 @@ def db(svc: Annotated[Services, Depends(services)]) -> Iterator[Session]:
 def current_user(request: Request, s: Annotated[Session, Depends(db)],
                  svc: Annotated[Services, Depends(services)],
                  authorization: Annotated[str | None, Header()] = None,
-                 x_user_id: Annotated[str | None, Header()] = None) -> User:
+                 x_user_id: Annotated[str | None, Header()] = None,
+                 x_dev_token: Annotated[str | None, Header()] = None) -> User:
     request.state.agent_id = None
     if authorization:
         scheme, _, token = authorization.partition(" ")
@@ -70,6 +99,7 @@ def current_user(request: Request, s: Annotated[Session, Depends(db)],
         return user
     if not svc.settings.dev_auth or svc.settings.paypal_env == "live":
         raise HTTPException(401, "login required")
+    check_dev_token(svc, x_dev_token)
     if not x_user_id:
         raise HTTPException(401, "missing X-User-Id header (dev auth)")
     try:
@@ -80,6 +110,17 @@ def current_user(request: Request, s: Annotated[Session, Depends(db)],
     if user is None:
         raise HTTPException(401, "unknown user")
     return user
+
+
+def check_dev_token(svc: Services, given: str | None) -> None:
+    want = svc.settings.dev_auth_token
+    if want and not hmac.compare_digest(want.encode(), (given or "").encode()):
+        raise HTTPException(401, "dev login needs a valid X-Dev-Token header")
+
+
+def require_dev_token(svc: Annotated[Services, Depends(services)],
+                      x_dev_token: Annotated[str | None, Header()] = None) -> None:
+    check_dev_token(svc, x_dev_token)
 
 
 def _agent_owner(request: Request, s: Session, key: str) -> User:

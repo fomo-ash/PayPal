@@ -23,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from verdict.config import get_settings  # noqa: E402
 
 API = os.environ.get("VERDICT_API_URL", "http://localhost:8000").rstrip("/")
+# the hosted API gates dev login behind DEV_AUTH_TOKEN; copy it from Render into this variable
+DEV_TOKEN = os.environ.get("VERDICT_DEV_TOKEN", "")
 TASK = Path(__file__).resolve().parents[1] / "bench" / "tasks" / "log_parser"
 DONE = {"PAID", "CODE_RELEASED", "VOIDED", "HUMAN_REVIEW", "PAYOUT_FAILED"}
 
@@ -55,7 +57,8 @@ def files(name: str) -> dict:
 def main() -> None:
     sub_name = sys.argv[1] if len(sys.argv) > 1 else "honest_full"
     worker_email = get_settings().sandbox_worker_email
-    with httpx.Client(base_url=API, timeout=120) as c:
+    headers = {"X-Dev-Token": DEV_TOKEN} if DEV_TOKEN else {}
+    with httpx.Client(base_url=API, timeout=120, headers=headers) as c:
         try:
             c.get("/health").raise_for_status()
         except httpx.HTTPError:

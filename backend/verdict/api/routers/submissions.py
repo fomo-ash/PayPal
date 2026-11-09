@@ -98,6 +98,7 @@ def examples_run(job_id: uuid.UUID, user: CurrentUser, s: DB, svc: Svc,
     """Public examples only. Hidden tests are never run here, so this cannot leak them."""
     job = get_job(s, job_id)
     active_claim(s, job, user)
+    svc.limiter.hit("examples-run", str(user.id), svc.settings.examples_runs_per_hour)
     files = _files(raw)
     row = s.get(Suite, job.id)
     assert row is not None

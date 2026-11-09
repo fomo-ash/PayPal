@@ -224,6 +224,7 @@ def validate(job_id: uuid.UUID, user: CurrentUser, s: DB, svc: Svc) -> dict:
     Runs while the job is still DRAFT; the result is applied with a compare-and-set, so two
     concurrent calls cannot both change the job."""
     job = owned_job(s, job_id, user)
+    svc.limiter.hit("validate", str(user.id), svc.settings.validate_per_hour)
     require_state(job, S.DRAFT)
     row = s.get(Suite, job.id)
     if row is None:

@@ -1,17 +1,18 @@
-"""DEV ONLY: create users to act as with the X-User-Id header. Mounted only when DEV_AUTH=true.
+"""DEV ONLY: create users to act as with the X-User-Id header. Mounted only when DEV_AUTH=true;
+needs X-Dev-Token when DEV_AUTH_TOKEN is set.
 Replaced by Log in with PayPal (Phase 4)."""
 
 from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from verdict.api.deps import DB
+from verdict.api.deps import DB, require_dev_token
 from verdict.db.models import User
 
-router = APIRouter(prefix="/dev", tags=["dev"])
+router = APIRouter(prefix="/dev", tags=["dev"], dependencies=[Depends(require_dev_token)])
 
 
 class NewUser(BaseModel):
