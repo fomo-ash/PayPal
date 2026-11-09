@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     inline_worker: bool = False               # `make local`: grade + pay in-process, no Redis
     dev_auth: bool = True                     # X-User-Id header login; never with live
     dev_auth_token: str = ""                  # when set, dev login also needs X-Dev-Token
+    demo_login: bool = False                  # web "try it" login as a demo buyer/worker/admin
+    demo_logins_per_hour: int = 30            # per client IP
     validate_per_hour: int = 12               # per user: sandbox + LLM runs cost credits
     examples_runs_per_hour: int = 60          # per user: public-example sandbox runs
     sandbox_backend: str = "e2b"

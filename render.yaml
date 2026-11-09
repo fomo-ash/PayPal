@@ -29,6 +29,9 @@ services:
       # public URL. Set DEV_AUTH false once the web app logs in with PayPal.
       - { key: DEV_AUTH, value: "true" }
       - { key: DEV_AUTH_TOKEN, generateValue: true }
+      # "Try it" buttons on the web app: a fresh demo buyer/worker/reviewer per visitor
+      # (sandbox only, rate-limited per IP).
+      - { key: DEMO_LOGIN, value: "true" }
       - { key: SESSION_SECRET, generateValue: true }
       - { key: PAYPAL_CLIENT_ID, sync: false }
       - { key: PAYPAL_SECRET, sync: false }

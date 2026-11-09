@@ -15,6 +15,7 @@ from verdict.api.routers import (
     admin,
     agents,
     auth,
+    demo,
     dev,
     jobs,
     receipts,
@@ -40,6 +41,14 @@ def create_app(services: Services | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict:
         return {"ok": True}
+
+    @app.get("/public-config")
+    def public_config() -> dict:
+        """What a browser may know: the PayPal client id is public by design (never the secret)."""
+        cfg = app.state.services.settings
+        return {"paypal_client_id": cfg.paypal_client_id, "paypal_env": cfg.paypal_env,
+                "demo_login": cfg.demo_login and cfg.paypal_env != "live",
+                "paypal_login": bool(cfg.session_secret and cfg.paypal_client_id)}
 
     @app.get("/me")
     def me(user: CurrentUser) -> dict:
@@ -67,6 +76,7 @@ def create_app(services: Services | None = None) -> FastAPI:
     app.include_router(receipts.router)
     app.include_router(auth.router)
     app.include_router(agents.router)
+    app.include_router(demo.router)
     if app.state.services.settings.dev_auth:
         app.include_router(dev.router)
     return app

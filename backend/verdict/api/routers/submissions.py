@@ -137,6 +137,38 @@ def submit(job_id: uuid.UUID, user: CurrentUser, s: DB, svc: Svc,
     return {"submission_id": str(sub.id), "sha256": sha, "state": S.SUBMITTED.value}
 
 
+@router.get("/submissions/mine")
+def my_work(user: CurrentUser, s: DB) -> list[dict]:
+    """The worker's claims, newest first, with the submission once there is one."""
+    rows = s.execute(select(Claim, Job).join(Job, Job.id == Claim.job_id)
+                     .where(Claim.worker_id == user.id)
+                     .order_by(Claim.accepted_at.desc()).limit(200)).all()
+    subs = {sub.claim_id: sub for sub in s.scalars(
+        select(Submission).where(Submission.worker_id == user.id))}
+    out = []
+    for c, job in rows:
+        sub = subs.get(c.id)
+        out.append({"job_id": str(job.id), "title": job.title, "amount": str(job.amount),
+                    "job_state": job.state, "claim_status": c.status,
+                    "deadline_at": c.deadline_at.isoformat(),
+                    "submission_id": str(sub.id) if sub else None,
+                    "via_agent": c.agent_id is not None})
+    return out
+
+
+@router.get("/jobs/{job_id}/submission")
+def job_submission(job_id: uuid.UUID, user: CurrentUser, s: DB) -> dict:
+    """The graded submission for a job, for its buyer or the worker who sent it."""
+    q = select(Submission).where(Submission.job_id == job_id)
+    if s.get(Job, job_id) is None:
+        raise HTTPException(404, "job not found")
+    sub = s.scalar(q.order_by(Submission.submitted_at.desc()).limit(1))
+    if sub is None:
+        raise HTTPException(404, "no submission yet")
+    sub, job = _visible_submission(s, sub.id, user)
+    return submission_view(s, sub, job)
+
+
 def _visible_submission(s: Session, sub_id: uuid.UUID, user: User) -> tuple[Submission, Job]:
     sub = s.get(Submission, sub_id)
     job = s.get(Job, sub.job_id) if sub else None
