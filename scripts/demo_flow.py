@@ -3,6 +3,7 @@
     terminal 1:  make local                      (API on http://localhost:8000, docs at /docs)
     terminal 2:  make demo                       (honest worker, gets paid)
                  make demo SUB=cheat_memorizer   (cheater, buyer's hold is voided)
+                 make demo SUB=cheat_timebomb    (passes every test; AI flags it → you review)
 
 You approve the payment in the browser as the sandbox BUYER, like in the spike.
 """
@@ -74,10 +75,13 @@ def main() -> None:
         up = call(c, "PUT", f"/jobs/{jid}/suite", buyer, json=suite)
         print(f"job {jid}\nsuite: {up['tests']} hidden tests, sha256 {up['sha256'][:16]}…")
 
-        step("3. validate: buyer's reference must pass every test (runs in the sandbox)")
+        step("3. validate: reference passes every test (sandbox) + AI spec check")
         t = time.time()
         v = call(c, "POST", f"/jobs/{jid}/validate", buyer)
-        print(f"{v['state']} in {time.time() - t:.1f}s", v["problems"] or "")
+        fair = sum(x["implied"] for x in v["spec_check"])
+        print(f"{v['state']} in {time.time() - t:.1f}s · spec check: "
+              f"{fair}/{len(v['spec_check'])} tests follow from the spec",
+              *(v["problems"] + v["warnings"]))
         if v["state"] != "AWAITING_FUNDS":
             sys.exit("validation failed")
 
@@ -117,10 +121,41 @@ def main() -> None:
             print(f"  score {float(v['score']):.1%} · settlement {v['settlement']} · "
                   f"capture ${v['capture']} (fee ${v['fee']}, worker ${v['worker_amount']}) · "
                   f"released to buyer ${v['released']}\n  reason: {v['reason']}")
+        ai = view.get("ai_review")
+        if ai:
+            print(f"  AI review ({ai['model']}): {ai['decision']} · {ai['explanation']}")
+            for f in ai["findings"]:
+                print(f"    {f['file']}:{f['line']} {f['category']}: {f['evidence']}")
+        if last == "HUMAN_REVIEW":
+            view, last = review(c, jid, sid, buyer, v)
         if last == "PAID":
             code = call(c, "GET", f"/submissions/{sid}/code", buyer)
             print("  buyer downloaded:", ", ".join(code["files"]), "→ CODE_RELEASED")
         print(f"\nOpen {API}/docs to explore · job {jid}")
+
+
+def review(c: httpx.Client, jid: str, sid: str, buyer: dict, v: dict) -> tuple[dict, str]:
+    step("8. human review: you are the admin (can lower or void, never raise)")
+    admin = {"X-User-Id": call(c, "POST", "/dev/users", json={
+        "role": "admin", "email": "admin@example.com", "display_name": "Demo admin"})["id"]}
+    print(f"  max you can approve: ${v['capture']}  (0 = void, buyer keeps everything)")
+    amount = input("  capture amount [0]: ").strip() or "0"
+    r = call(c, "POST", f"/admin/reviews/{jid}", admin,
+             json={"capture": amount, "note": "decided in the demo"})
+    print(f"  → {r['settlement']} ${r['capture']} · {r['state']}")
+    last, view = r["state"], {}
+    for _ in range(150):
+        view = call(c, "GET", f"/submissions/{sid}", buyer)
+        if view["job_state"] != last:
+            last = view["job_state"]
+            print(f"  {time.strftime('%H:%M:%S')}  {last}")
+        if last in DONE - {"HUMAN_REVIEW"}:
+            break
+        time.sleep(4)
+    vv = view["verdict"]
+    print(f"  final: capture ${vv['capture']} (worker ${vv['worker_amount']}) · "
+          f"released to buyer ${vv['released']} · decided by {vv['decided_by']}")
+    return view, last
 
 
 if __name__ == "__main__":
