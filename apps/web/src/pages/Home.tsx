@@ -3,6 +3,7 @@ import { AgGridReact } from "ag-grid-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ErrorNote } from "../components";
+import { HoldStory } from "../story";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { pct, usd } from "../lib/format";
@@ -34,7 +35,6 @@ export default function Home() {
     <>
       <section className="intro">
         <div>
-          <p className="eyebrow">Pay-on-verification, on PayPal</p>
           <h1>Pay only for the code that passes.</h1>
           <p className="lede">
             The buyer's money is held by PayPal, not charged. Hidden tests and 200 fresh inputs grade the work in a sandbox,
@@ -48,14 +48,9 @@ export default function Home() {
             <a className="btn btn--ghost" href="https://verdict-site.onrender.com">How it works</a>
           </div>
         </div>
-        <ol className="flow" aria-label="How one job moves">
-          <li><b>Hold</b><span>PayPal authorizes the budget. Nothing is charged.</span></li>
-          <li><b>Test</b><span>Hidden tests plus fresh inputs, in an isolated sandbox.</span></li>
-          <li><b>Judge</b><span>AI review cites lines. It can only send a case to a person.</span></li>
-          <li><b>Settle</b><span>Partial capture, void the rest, pay the worker.</span></li>
-          <li><b>Proof</b><span>A signed receipt anyone can verify.</span></li>
-        </ol>
       </section>
+
+      <HoldStory />
 
       <section id="open" className="block">
         <div className="block__head">
