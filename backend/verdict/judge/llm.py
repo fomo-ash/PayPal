@@ -46,6 +46,12 @@ class LLMResult:
     raw: str
 
 
+def untrusted(text: str) -> str:
+    """Neutralise closing tags so text written by a worker or buyer cannot end the
+    <untrusted>/<tests> block it is wrapped in and pose as instructions."""
+    return text.replace("</", "<\\/")
+
+
 def _extract_json(text: str) -> str:
     """Accept bare JSON or JSON wrapped in ``` fences / surrounding prose."""
     text = text.strip()
@@ -100,6 +106,7 @@ class LLMClient:
 
 
 def client_from_settings(settings) -> LLMClient:
+    """Raises LLMUnavailable when no provider key is set."""
     providers = [
         Provider(settings.llm_provider, settings.llm_base_url, settings.llm_api_key,
                  settings.judge_model),
@@ -107,3 +114,12 @@ def client_from_settings(settings) -> LLMClient:
                  settings.llm_fallback_model),
     ]
     return LLMClient(providers)
+
+
+def optional_client(settings) -> LLMClient | None:
+    """The judge client, or None when no LLM key is configured (the AI steps are skipped)."""
+    try:
+        return client_from_settings(settings)
+    except LLMUnavailable:
+        log.warning("no LLM key configured: spec check and AI review are skipped")
+        return None

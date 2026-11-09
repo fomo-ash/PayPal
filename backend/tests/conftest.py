@@ -190,3 +190,32 @@ def submitted(api, user, open_job):
         assert r.status_code == 201, r.text
         return buyer, w, job_id, r.json()["submission_id"]
     return _make
+
+
+class FakeLLM:
+    """Stands in for judge.llm.LLMClient. `reply(prompt, schema)` returns the JSON object the
+    model would send, or raises (e.g. LLMUnavailable). Every prompt is kept in .prompts."""
+
+    def __init__(self, reply):
+        self.reply = reply
+        self.prompts: list[str] = []
+
+    def chat_json(self, system, user, schema, **kw):
+        from verdict.judge.llm import LLMResult
+
+        self.prompts.append(user)
+        data = self.reply(user, schema)
+        return LLMResult(schema.model_validate(data), "fake", "fake-model", "")
+
+
+def spec_reply(unfair=()):
+    """FakeLLM reply for the spec check: every test in the prompt is implied unless listed."""
+    import re
+
+    def reply(prompt, schema):
+        tests = prompt.rsplit("<tests>", 1)[1]
+        ids = re.findall(r'"id": "([^"]+)"', tests)
+        return {"items": [{"test_id": i, "implied_by_spec": i not in unfair,
+                           "reason": "not in the spec" if i in unfair else "follows from spec"}
+                          for i in ids]}
+    return reply

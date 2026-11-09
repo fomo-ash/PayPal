@@ -5,7 +5,7 @@ GET  /jobs                       open jobs (public view: spec, examples, weights
 GET  /jobs/mine                  the buyer's own jobs, any state
 GET  /jobs/{id}                  public view (drafts: owner only)
 PUT  /jobs/{id}/suite            hidden tests + examples + reference (+ generator), DRAFT only
-POST /jobs/{id}/validate         reference must pass every test → AWAITING_FUNDS, else INVALID
+POST /jobs/{id}/validate         reference passes every test + AI spec check → AWAITING_FUNDS
 POST /jobs/{id}/edit             INVALID → DRAFT
 POST /jobs/{id}/cancel           DRAFT | INVALID | AWAITING_FUNDS → CANCELLED (nothing is held)
 """
@@ -27,10 +27,12 @@ from verdict.api.deps import DB, CurrentUser, Svc
 from verdict.core.scoring import CENT
 from verdict.core.state_machine import JobState as S
 from verdict.db.models import Job, Suite, TestGroup, User, utcnow
+from verdict.db.models import SpecCheck as SpecCheckRow
 from verdict.db.repo import append_audit, move_job
 from verdict.grading import oracle
 from verdict.grading.compare import outputs_match
 from verdict.grading.suite import SuiteUpload, parse_upload
+from verdict.judge.spec_check import SpecCheckOutcome, check_spec
 from verdict.storage import BlobStore
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -130,6 +132,8 @@ def public_view(s: Session, store: BlobStore, job: Job, *, owner: bool) -> dict[
                     "fresh_inputs": g.fresh_count} for g in groups],
         "examples": examples,
         "suite_sha256": job.suite_sha256,            # sealed at funding; None before
+        "spec_checked": s.scalar(select(SpecCheckRow.id)
+                                 .where(SpecCheckRow.job_id == job.id).limit(1)) is not None,
         "created_at": job.created_at.isoformat(),
     }
     if owner:
@@ -215,34 +219,56 @@ def upload_suite(job_id: uuid.UUID, user: CurrentUser, s: DB, svc: Svc,
 
 @router.post("/{job_id}/validate")
 def validate(job_id: uuid.UUID, user: CurrentUser, s: DB, svc: Svc) -> dict:
-    """Runs the buyer's reference (in the sandbox) on every hidden test and the examples, and
-    checks the generator. Runs while the job is still DRAFT; the result is applied with a
-    compare-and-set, so two concurrent calls cannot both change the job."""
+    """Runs the buyer's reference (in the sandbox) on every hidden test and the examples,
+    checks the generator, then asks the AI whether each hidden test follows from the spec.
+    Runs while the job is still DRAFT; the result is applied with a compare-and-set, so two
+    concurrent calls cannot both change the job."""
     job = owned_job(s, job_id, user)
     require_state(job, S.DRAFT)
     row = s.get(Suite, job.id)
     if row is None:
         raise HTTPException(409, "upload a suite first")
     up = load_suite(svc.store, row)
-    sha = row.sha256
-    s.rollback()                                   # no transaction held during sandbox runs
+    sha, spec_md = row.sha256, job.spec_md
+    s.rollback()                                   # no transaction held during slow work
 
     problems = check_suite(svc, up)
+    fairness: SpecCheckOutcome | None = None
+    warnings: list[str] = []
+    if not problems:
+        if svc.llm is None:
+            warnings.append("spec check skipped: no AI configured")
+        else:
+            fairness = check_spec(svc.llm, spec_md, up.doc["examples"], up.doc["tests"])
+            if fairness.error:
+                warnings.append("spec check skipped: AI unavailable")
+            problems += [f"{i.test_id}: not implied by the spec ({i.reason})"
+                         for i in fairness.unfair]
 
     job = get_job(s, job_id, for_update=True)
     row = s.get(Suite, job.id)
-    if row is None or row.sha256 != sha:
-        raise HTTPException(409, "suite changed during validation; validate again")
+    if row is None or row.sha256 != sha or job.spec_md != spec_md:
+        raise HTTPException(409, "suite or spec changed during validation; validate again")
     move_job(s, job.id, S.DRAFT, S.VALIDATING, reason="validate", data={"sha256": sha})
+    s.execute(delete(SpecCheckRow).where(SpecCheckRow.job_id == job.id))
+    if fairness is not None:
+        s.add_all(SpecCheckRow(job_id=job.id, test_id=i.test_id, implied=i.implied_by_spec,
+                               reason=i.reason) for i in fairness.items)
+        append_audit(s, job.id, "spec_check", {
+            "model": fairness.model, "error": fairness.error, "tests": len(fairness.items),
+            "unfair": [i.test_id for i in fairness.unfair]})
     if problems:
-        move_job(s, job.id, S.VALIDATING, S.INVALID, reason="reference failed",
+        move_job(s, job.id, S.VALIDATING, S.INVALID, reason="validation failed",
                  data={"problems": problems[:20]})
     else:
         row.validated_at = utcnow()
         move_job(s, job.id, S.VALIDATING, S.AWAITING_FUNDS, reason="validated")
     s.commit()
     return {"state": S.INVALID.value if problems else S.AWAITING_FUNDS.value,
-            "problems": problems[:20]}
+            "problems": problems[:20], "warnings": warnings,
+            "spec_check": [] if fairness is None else [
+                {"test_id": i.test_id, "implied": i.implied_by_spec, "reason": i.reason}
+                for i in fairness.items]}
 
 
 def check_suite(svc: Any, up: SuiteUpload) -> list[str]:

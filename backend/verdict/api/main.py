@@ -54,6 +54,7 @@ def create_app(services: Services | None = None) -> FastAPI:
 
 def default_services(cfg: Settings) -> Services:
     from verdict.db.session import make_session_factory
+    from verdict.judge.llm import optional_client
     from verdict.paypal.client import PayPalClient
     from verdict.storage import LocalBlobStore
     from verdict.worker.runners import make_runner
@@ -66,7 +67,8 @@ def default_services(cfg: Settings) -> Services:
               if cfg.paypal_client_id and cfg.paypal_secret else None)
     svc = Services(settings=cfg, Session=make_session_factory(cfg.database_url),
                    store=LocalBlobStore(cfg.blob_dir), paypal=paypal,
-                   runner=make_runner(cfg), enqueue_grading=enqueue_grading)
+                   runner=make_runner(cfg), enqueue_grading=enqueue_grading,
+                   llm=optional_client(cfg))
     if cfg.inline_worker:
         from verdict.worker.inline import start
         svc.enqueue_grading = lambda submission_id: start(svc, submission_id)

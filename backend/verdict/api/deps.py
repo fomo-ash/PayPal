@@ -1,6 +1,6 @@
 """Request dependencies: DB session, current user, and the app's services.
 
-Services (session factory, blob store, PayPal client, sandbox runner, task queue) live on
+Services (session factory, blob store, PayPal client, sandbox runner, LLM, task queue) live on
 `app.state` so tests can build an app with fakes: `create_app(Services(...))`.
 
 Auth (until Log in with PayPal lands in Phase 4): DEV ONLY header `X-User-Id: <uuid>`.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, Request
@@ -31,6 +31,9 @@ class Services:
     paypal: Any                                   # PayPalClient (or a fake in tests)
     runner: Runner
     enqueue_grading: Callable[[uuid.UUID], None]  # Celery .delay in prod, inline in tests
+    llm: Any = None                               # judge.llm.LLMClient; None = AI not configured
+    # run the outbox now for a job a reviewer just settled; the beat tick does it anyway
+    kick_money: Callable[[uuid.UUID], None] = field(default=lambda job_id: None)
 
 
 def services(request: Request) -> Services:
