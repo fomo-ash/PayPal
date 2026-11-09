@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     paypal_cancel_url: str = "http://localhost:3000/fund/cancel"
     sandbox_worker_email: str = ""            # demo worker's sandbox PayPal (payout receiver)
     paypal_login_redirect_uri: str = "http://localhost:3000/auth/callback"
+    paypal_login_enabled: bool = True         # show "Log in with PayPal" on the web app
 
     # LLM: any OpenAI-compatible provider. Default: Groq free tier, Gemini free tier as fallback.
     llm_provider: str = "groq"

@@ -48,7 +48,8 @@ def create_app(services: Services | None = None) -> FastAPI:
         cfg = app.state.services.settings
         return {"paypal_client_id": cfg.paypal_client_id, "paypal_env": cfg.paypal_env,
                 "demo_login": cfg.demo_login and cfg.paypal_env != "live",
-                "paypal_login": bool(cfg.session_secret and cfg.paypal_client_id)}
+                "paypal_login": bool(cfg.paypal_login_enabled and cfg.session_secret
+                                     and cfg.paypal_client_id)}
 
     @app.get("/me")
     def me(user: CurrentUser) -> dict:
