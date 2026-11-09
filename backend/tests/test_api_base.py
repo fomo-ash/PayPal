@@ -19,3 +19,14 @@ def test_dev_auth_refused_with_live_paypal(api, user):
     h = user("buyer")
     api.services.settings = Settings(_env_file=None, dev_auth=True, paypal_env="live")
     assert api.get("/me", headers=h).status_code == 401
+
+
+def test_cors_allows_the_web_app_only(api):
+    ok = api.options("/jobs", headers={"Origin": "http://localhost:3000",
+                                       "Access-Control-Request-Method": "POST",
+                                       "Access-Control-Request-Headers": "authorization"})
+    assert ok.status_code == 200
+    assert ok.headers["access-control-allow-origin"] == "http://localhost:3000"
+    bad = api.options("/jobs", headers={"Origin": "https://evil.example",
+                                        "Access-Control-Request-Method": "POST"})
+    assert "access-control-allow-origin" not in bad.headers

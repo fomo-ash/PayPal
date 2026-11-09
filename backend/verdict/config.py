@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = "gemini-flash-latest"
 
+    cors_origins: str = "http://localhost:3000"   # comma-separated web origins allowed to call the API
+    session_secret: str = ""                  # signs login sessions; scripts/gen_secrets.py
     inline_worker: bool = False               # `make local`: grade + pay in-process, no Redis
     dev_auth: bool = True                     # X-User-Id header login; never with live
     sandbox_backend: str = "e2b"
@@ -56,6 +58,14 @@ class Settings(BaseSettings):
     new_buyer_payout_delay_hours: int = 0
 
     receipt_signing_key_b64: str = ""
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def paypal_web_url(self) -> str:
+        return "https://www.paypal.com" if self.paypal_env == "live" else "https://www.sandbox.paypal.com"
 
     @property
     def paypal_base_url(self) -> str:

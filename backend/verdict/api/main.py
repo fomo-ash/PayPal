@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from verdict.api.deps import CurrentUser, Services
@@ -22,6 +23,10 @@ from verdict.worker.money import MoneyError
 def create_app(services: Services | None = None) -> FastAPI:
     app = FastAPI(title="Verdict API", version="0.1.0")
     app.state.services = services or default_services(get_settings())
+    app.add_middleware(
+        CORSMiddleware, allow_origins=app.state.services.settings.cors_origin_list,
+        allow_methods=["GET", "POST", "PUT"], allow_credentials=False,
+        allow_headers=["Authorization", "Content-Type", "X-User-Id"])
 
     @app.get("/health")
     def health() -> dict:
