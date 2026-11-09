@@ -29,6 +29,7 @@ changes only grammar and world will fail it.
 | Build | Grammar | Nav treatment | Hero device | Act-sequence shape | Close pattern | Signature move | World | Port |
 |---|---|---|---|---|---|---|---|---|
 | verdict | Tracked object (new) | Fixed lifecycle rail of the object's states, clickable, plus one CTA | Pinned 3-plane UI parallax (job sheet, hold card, request-id strip), status ticks CREATED→AUTHORIZED | pin > flow(count) > flow(reveal) > pin(peak) > flow(count), 5 acts, 7.4vh | Receipt panel whose last line is the CTA, footer under it | Hold tears at computed cents; steppers re-tear it live, voids below 50% | Light paper UI, no imagery, Geist + Geist Mono | 4500 |
+| verdict-app | Working surface with one told story (app; scroll story on Home only) | Role tabs + role badge in a sticky top bar, no rail | Pinned two-column act: step list + one ledger card that fills line by line (held → testing → judged → settled → signed) | flow(intro) > pin(ledger, 3.4vh) > flow(live AG Grid); verdict page: timed peak, not scroll | Live data table of open jobs (Home); signed-receipt card with a working Verify (verdict) | The tear driven by live API cents, once, after a 450ms whole-bar silence | Light paper UI, no imagery, Geist + Geist Mono | 5180 |
 
 ---
 
