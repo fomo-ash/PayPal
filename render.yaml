@@ -32,6 +32,11 @@ services:
       # "Try it" buttons on the web app: a fresh demo buyer/worker/reviewer per visitor
       # (sandbox only, rate-limited per IP).
       - { key: DEMO_LOGIN, value: "true" }
+      # The web app's origin. If Render gives verdict-web a different URL, change it here.
+      - { key: CORS_ORIGINS, value: "https://verdict-web.onrender.com,http://localhost:3000" }
+      - { key: PAYPAL_LOGIN_REDIRECT_URI, value: "https://verdict-web.onrender.com/auth/callback" }
+      # true once that URL is the Return URL of "Log in with PayPal" in the PayPal app settings
+      - { key: PAYPAL_LOGIN_ENABLED, value: "false" }
       - { key: SESSION_SECRET, generateValue: true }
       - { key: PAYPAL_CLIENT_ID, sync: false }
       - { key: PAYPAL_SECRET, sync: false }
@@ -43,6 +48,18 @@ services:
       - { key: RECEIPT_SIGNING_KEY_B64, sync: false }
       # When the web app is deployed, add CORS_ORIGINS, PAYPAL_RETURN_URL, PAYPAL_CANCEL_URL and
       # PAYPAL_LOGIN_REDIRECT_URI pointing at it (left out until then so defaults apply).
+
+  # The web app (Vite + React, built to static files). Calls verdict-api from the browser.
+  - type: web
+    name: verdict-web
+    runtime: static
+    buildCommand: cd apps/web && npm ci && npm run build
+    staticPublishPath: apps/web/dist
+    routes:
+      - { type: rewrite, source: /*, destination: /index.html }
+    envVars:
+      - { key: NODE_VERSION, value: "22" }
+      - { key: VITE_API_URL, value: "https://verdict-api-zyaa.onrender.com" }
 
   # The scroll landing page (plain HTML/CSS/JS). Static sites are free and never sleep.
   - type: web
