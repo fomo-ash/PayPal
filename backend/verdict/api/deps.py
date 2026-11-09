@@ -9,17 +9,19 @@ DEV ONLY fallback: header `X-User-Id: <uuid>`, refused when DEV_AUTH is off or P
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from verdict.api import sessions
 from verdict.config import Settings
-from verdict.db.models import User
+from verdict.db.models import Agent, User
 from verdict.sandbox.runner import Runner
 from verdict.storage import BlobStore
 
@@ -50,13 +52,17 @@ def db(svc: Annotated[Services, Depends(services)]) -> Iterator[Session]:
         s.close()
 
 
-def current_user(s: Annotated[Session, Depends(db)],
+def current_user(request: Request, s: Annotated[Session, Depends(db)],
                  svc: Annotated[Services, Depends(services)],
                  authorization: Annotated[str | None, Header()] = None,
                  x_user_id: Annotated[str | None, Header()] = None) -> User:
+    request.state.agent_id = None
     if authorization:
         scheme, _, token = authorization.partition(" ")
-        body = (sessions.read(svc.settings.session_secret, "session", token.strip())
+        token = token.strip()
+        if scheme.lower() == "bearer" and token.startswith("vk_"):
+            return _agent_owner(request, s, token)
+        body = (sessions.read(svc.settings.session_secret, "session", token)
                 if scheme.lower() == "bearer" else None)
         user = s.get(User, uuid.UUID(body["u"])) if body else None
         if user is None:
@@ -74,6 +80,16 @@ def current_user(s: Annotated[Session, Depends(db)],
     if user is None:
         raise HTTPException(401, "unknown user")
     return user
+
+
+def _agent_owner(request: Request, s: Session, key: str) -> User:
+    agent = s.scalar(select(Agent).where(
+        Agent.api_key_hash == hashlib.sha256(key.encode()).hexdigest()))
+    owner = s.get(User, agent.owner_user_id) if agent else None
+    if agent is None or owner is None:
+        raise HTTPException(401, "unknown agent key")
+    request.state.agent_id = agent.id
+    return owner
 
 
 DB = Annotated[Session, Depends(db)]

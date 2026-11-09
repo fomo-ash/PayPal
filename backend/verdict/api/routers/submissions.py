@@ -16,7 +16,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -67,7 +67,7 @@ def active_claim(s: Session, job: Job, user: User) -> Claim:
 
 
 @router.post("/jobs/{job_id}/claim", status_code=201)
-def claim(job_id: uuid.UUID, user: CurrentUser, s: DB) -> dict:
+def claim(job_id: uuid.UUID, user: CurrentUser, s: DB, request: Request) -> dict:
     job = get_job(s, job_id, for_update=True)
     if user.role != "worker":
         raise HTTPException(403, "only workers can claim jobs")
@@ -80,12 +80,13 @@ def claim(job_id: uuid.UUID, user: CurrentUser, s: DB) -> dict:
     if already is not None:
         raise HTTPException(409, "you already submitted to this job (one graded try)")
     require_state(job, S.OPEN)
-    c = Claim(job_id=job.id, worker_id=user.id,
+    c = Claim(job_id=job.id, worker_id=user.id, agent_id=request.state.agent_id,
               deadline_at=utcnow() + timedelta(hours=job.deadline_hours))
     s.add(c)
     s.flush()
     move_job(s, job.id, S.OPEN, S.CLAIMED, reason="claimed",
-             data={"worker": user.id, "claim": c.id, "deadline": c.deadline_at})
+             data={"worker": user.id, "claim": c.id, "deadline": c.deadline_at,
+                   "agent": request.state.agent_id})
     s.commit()
     return {"claim_id": str(c.id), "deadline_at": c.deadline_at.isoformat(),
             "state": S.CLAIMED.value}
