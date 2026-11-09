@@ -3,7 +3,7 @@
 POST /jobs/{id}/claim            worker accepts the job; the deadline starts
 POST /jobs/{id}/examples-run     run code on the PUBLIC examples only, as often as wanted
 POST /jobs/{id}/submit           the ONE graded submission → SUBMITTED, grading queued
-GET  /submissions/{id}           status, verdict and group scores (worker or buyer)
+GET  /submissions/{id}           status, verdict, scores, scanner + AI findings (both sides)
 GET  /submissions/{id}/code      buyer only, once paid (PAID → CODE_RELEASED)
 """
 
@@ -23,7 +23,19 @@ from sqlalchemy.orm import Session
 from verdict.api.deps import DB, CurrentUser, Svc
 from verdict.api.routers.jobs import get_job, load_suite, require_state
 from verdict.core.state_machine import JobState as S
-from verdict.db.models import Claim, Job, Run, Submission, Suite, User, Verdict, as_utc, utcnow
+from verdict.db.models import (
+    AIReview,
+    Claim,
+    Job,
+    Run,
+    ScanFinding,
+    Submission,
+    Suite,
+    User,
+    Verdict,
+    as_utc,
+    utcnow,
+)
 from verdict.db.repo import append_audit, move_job
 from verdict.grading.compare import outputs_match
 from verdict.grading.files import FilesError, files_sha256, parse_files, write_tree
@@ -136,6 +148,9 @@ def get_submission(sub_id: uuid.UUID, user: CurrentUser, s: DB) -> dict:
     sub, job = _visible_submission(s, sub_id, user)
     v = s.get(Verdict, sub.id)
     runs = s.scalars(select(Run).where(Run.submission_id == sub.id)).all()
+    scans = s.scalars(select(ScanFinding).where(ScanFinding.submission_id == sub.id)).all()
+    ai = s.scalar(select(AIReview).where(AIReview.submission_id == sub.id)
+                  .order_by(AIReview.created_at.desc()).limit(1))
     return {
         "id": str(sub.id), "job_id": str(job.id), "job_state": job.state,
         "sha256": sub.sha256, "submitted_at": sub.submitted_at.isoformat(),
@@ -146,6 +161,11 @@ def get_submission(sub_id: uuid.UUID, user: CurrentUser, s: DB) -> dict:
             "fee": str(v.fee), "worker_amount": str(v.worker_amount),
             "released": str(v.released), "settlement": v.settlement,
             "reason": v.policy_reason, "decided_by": v.decided_by},
+        "scan_findings": [{"rule": f.rule, "file": f.file, "line": f.line, "message": f.message,
+                           "hard_signal": f.hard_signal} for f in scans],
+        "ai_review": None if ai is None else {
+            "decision": ai.decision, "model": ai.model, "findings": ai.findings,
+            "explanation": ai.explanation},
     }
 
 

@@ -5,8 +5,11 @@ The results are then written in ONE transaction that starts with a compare-and-s
 SUBMITTED → GRADING, so if two workers grade the same submission only one result is kept,
 and a crash mid-grading simply leaves the job SUBMITTED for the sweeper to retry.
 
-AI review (Phase 3) slots in between scoring and settle; until then the AI input is CLEAR,
-which can never raise a payout or block on its own.
+AI review runs after scoring, also outside any transaction, and only when the deterministic
+result would pay something (a void cannot be changed by the AI, so there is nothing to ask).
+Its answer is an enum: CLEAR keeps the capture, anything else sends the job to a person with
+the capture capped at the scored amount. The AI failing counts as HUMAN_REVIEW. With no LLM
+configured (llm=None) the step is skipped and recorded as such.
 """
 
 from __future__ import annotations
@@ -18,18 +21,20 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from verdict.core.policy import AIDecision, PolicyResult, Settlement
+from verdict.core.policy import AIDecision, PolicyResult, Settlement, decide
 from verdict.core.state_machine import JobState as S
-from verdict.db.models import Job, Run, ScanFinding, Submission, Suite, as_utc, utcnow
+from verdict.db.models import AIReview, Job, Run, ScanFinding, Submission, Suite, as_utc, utcnow
 from verdict.db.repo import StaleState, move_job
 from verdict.grading import oracle
 from verdict.grading.files import write_tree
 from verdict.grading.pipeline import GradeReport, grade, new_seed, zero_payout
 from verdict.grading.suite import SuiteUpload, to_pipeline_suite
+from verdict.judge.review import ReviewOutcome, review_submission
 from verdict.sandbox.runner import Runner
 from verdict.storage import BlobStore
 from verdict.worker import money
@@ -46,7 +51,7 @@ class GradeOutcome:
 
 def grade_submission(Session: sessionmaker, store: BlobStore, runner: Runner,  # noqa: N803
                      submission_id: uuid.UUID, *, timeout_s: float = 2.0,
-                     seed: int | None = None) -> GradeOutcome:
+                     seed: int | None = None, llm: Any = None) -> GradeOutcome:
     with Session() as s:
         sub = s.get(Submission, submission_id)
         job = s.get(Job, sub.job_id) if sub else None
@@ -59,11 +64,15 @@ def grade_submission(Session: sessionmaker, store: BlobStore, runner: Runner,  #
                             store.get(row.generator_key).decode() if row.generator_key else None,
                             row.sha256)
         job_id, amount, fee_bps, min_score = job.id, str(job.amount), job.fee_bps, job.min_score
+        spec_md = job.spec_md
         if job.suite_sha256 != row.sha256:
             raise RuntimeError(f"job {job_id}: stored suite does not match the sealed hash")
 
     seed = new_seed() if seed is None else seed
     report, override = _run(files, suite, runner, amount, fee_bps, min_score, timeout_s, seed)
+    ai = ai_review(llm, spec_md, files, report, min_score)
+    if ai is not None and report.payout is not None:
+        report.decision = decide(report.payout, report.signals, ai.decision)
 
     with Session() as s:
         try:
@@ -72,13 +81,14 @@ def grade_submission(Session: sessionmaker, store: BlobStore, runner: Runner,  #
         except StaleState:
             s.rollback()
             return GradeOutcome("lost_race")
-        _store_results(s, submission_id, report)
+        _store_results(s, submission_id, report, ai)
         payout = report.payout or zero_payout(to_pipeline_suite(suite.doc, min_score),
                                               amount, fee_bps)
         decision = override or report.decision
         assert decision is not None
         move_job(s, job_id, S.GRADING, S.JUDGING, reason=decision.reason,
-                 data={"score": payout.score, "signals": [str(x) for x in report.signals]})
+                 data={"score": payout.score, "signals": [str(x) for x in report.signals],
+                       "ai": ai.decision.value if ai else "skipped"})
         state = money.settle(s, job_id, submission_id, payout, decision)
         s.commit()
     return GradeOutcome("graded", state.value)
@@ -109,7 +119,25 @@ def _run(files: dict[str, str], suite: SuiteUpload, runner: Runner, amount: str,
             return report, None
 
 
-def _store_results(s: Session, submission_id: uuid.UUID, report: GradeReport) -> None:
+def ai_review(llm: Any, spec: str, files: dict[str, str], report: GradeReport,
+            min_score: Any) -> ReviewOutcome | None:
+    """Ask the AI only when the deterministic result pays something; None = not asked."""
+    if llm is None or report.signals or report.payout is None or not report.payout.capture:
+        return None
+    lines = [f"score {report.payout.score:.4f} (minimum {min_score})"]
+    lines += [f"hidden {g}: {p}/{t} passed" for g, (p, t) in report.hidden.items()]
+    lines += [f"fresh {g}: {p}/{t} passed" for g, (p, t) in report.fresh.items()]
+    if report.flaky:
+        lines.append(f"flaky (excluded): {', '.join(report.flaky)}")
+    findings = "\n".join(f"{f.file}:{f.line} {f.rule}: {f.message}" for f in report.findings)
+    out = review_submission(llm, spec, "\n".join(lines), findings, files)
+    if out.error:
+        log.warning("AI review unavailable, sending to a person: %s", out.error)
+    return out
+
+
+def _store_results(s: Session, submission_id: uuid.UUID, report: GradeReport,
+                   ai: ReviewOutcome | None = None) -> None:
     sub = s.get(Submission, submission_id)
     assert sub is not None
     sub.grading_seed = str(report.seed)
@@ -125,6 +153,13 @@ def _store_results(s: Session, submission_id: uuid.UUID, report: GradeReport) ->
     for r in report.rejected:
         s.add(ScanFinding(submission_id=submission_id, rule="reject_list", file="", line=0,
                           message=r, hard_signal="REJECTED_FILE"))
+    if ai is not None:
+        s.add(AIReview(
+            submission_id=submission_id, model=ai.model or "unavailable",
+            decision=ai.decision.value,
+            findings=[f.model_dump(mode="json") for f in ai.review.findings] if ai.review else [],
+            explanation=(ai.review.explanation if ai.review
+                         else f"AI review unavailable: {ai.error}"[:2000])))
 
 
 def stale_submissions(Session: sessionmaker, now: datetime | None = None) -> list[uuid.UUID]:  # noqa: N803

@@ -28,7 +28,8 @@ def start(svc: Any, submission_id: uuid.UUID) -> None:
 def run(svc: Any, submission_id: uuid.UUID) -> None:
     try:
         out = grading.grade_submission(svc.Session, svc.store, svc.runner, submission_id,
-                                       timeout_s=svc.settings.sandbox_test_timeout_ms / 1000)
+                                       timeout_s=svc.settings.sandbox_test_timeout_ms / 1000,
+                                       llm=svc.llm)
         log.warning("graded %s → %s", submission_id, out)
         deadline = time.monotonic() + MAX_WAIT_S
         while time.monotonic() < deadline:
