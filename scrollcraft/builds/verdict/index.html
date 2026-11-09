@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Verdict · Pay for code that passes</title>
+<meta name="description" content="PayPal holds the money. Hidden tests, fresh inputs and an AI cheat check decide how much of it moves. Cheaters get nothing.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111111'/><path d='M9 16.5l4.5 4.5L23 11' stroke='%23F6F5F1' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="scrollcraft.css">
+<style>
+  /* ── tokens: one light theme, used everywhere ─────────────────────────── */
+  :root {
+    --sc-canvas: #F6F5F1;  --sc-surface: #FDFCF9;
+    --sc-ink: #111111;     --sc-ink-soft: #55534E;
+    --sc-accent: #15803D;  --sc-accent-ink: #FDFCF9;
+    --sc-font-display: "Geist", system-ui, sans-serif;
+    --sc-font-text: "Geist", system-ui, sans-serif;
+    --sc-font-mono: "Geist Mono", ui-monospace, monospace;
+    --sc-shadow-color: 40 12% 22%;
+
+    --paid: #16A34A;            /* fills: money that moves to the worker   */
+    --paid-ink: #15803D;        /* text in that role (4.7:1 on canvas)     */
+    --void: #B91C1C;            /* text and borders: voided or cheating    */
+    --void-wash: #FBEDEB;
+    --fee: #DAD7CF;
+    --line: #E3E0D8;
+    --r-card: 14px; --r-ctl: 10px; --r-tag: 6px;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --bar-h: 88px;
+  }
+  body { background: var(--sc-canvas); color: var(--sc-ink); }
+  .mono, .num { font-family: var(--sc-font-mono); font-variant-numeric: tabular-nums; }
+  .ico { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; fill: none;
+         stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  /* ── lifecycle rail: the nav is the hold's own life ───────────────────── */
+  .rail-nav { position: fixed; inset: 0 0 auto 0; z-index: 40; height: 60px;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    padding-inline: var(--sc-gutter); background: color-mix(in oklab, var(--sc-canvas) 94%, transparent);
+    border-bottom: 1px solid var(--line); }
+  .mark { display: inline-flex; align-items: center; gap: 10px; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--sc-ink); text-decoration: none; font-size: 1.02rem; }
+  .mark svg { width: 22px; height: 22px; }
+  .steps { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
+  .steps a { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--r-ctl);
+    color: var(--sc-ink-soft); text-decoration: none; font-size: var(--sc-t-sm);
+    transition: color 160ms var(--ease), background-color 160ms var(--ease); }
+  .steps a::before { content: ""; width: 7px; height: 7px; border-radius: 50%;
+    border: 1.5px solid currentColor; transition: background-color 160ms var(--ease); }
+  .steps a.done::before { background: currentColor; }
+  .steps a.now { color: var(--sc-ink); background: #ECEAE3; }
+  .steps a.now::before { background: var(--paid); border-color: var(--paid); }
+  .steps a:hover { color: var(--sc-ink); }
+  .rail-nav .btn { justify-self: end; }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+    border-radius: var(--r-ctl); background: var(--sc-ink); color: var(--sc-canvas);
+    font: 500 var(--sc-t-sm)/1 var(--sc-font-text); text-decoration: none; white-space: nowrap;
+    border: 1px solid var(--sc-ink); cursor: pointer;
+    transition: background-color 140ms var(--ease), transform 120ms var(--ease); }
+  .btn:hover { background: #2A2A2A; }
+  .btn:active { transform: translateY(1px); }
+  .btn[aria-disabled="true"], .btn:disabled { opacity: .45; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--paid-ink); outline-offset: 3px; border-radius: 4px; }
+
+  /* ── act 1: hero, the hold is the subject ─────────────────────────────── */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: center; gap: var(--sc-8); height: 100%;
+    padding: 96px var(--sc-gutter) var(--sc-7); max-width: var(--sc-maxw); margin: 0 auto; }
+  .hero h1 { font-size: clamp(2.9rem, 1.6rem + 4.4vw, 5.6rem); line-height: 0.98;
+    letter-spacing: -0.045em; font-weight: 600; margin: 0; text-wrap: balance; }
+  .hero__sub { margin-top: var(--sc-5); font-size: var(--sc-t-lg); line-height: 1.45;
+    color: var(--sc-ink-soft); max-width: 30ch; }
+  .hero__fact { margin-top: var(--sc-6); display: flex; gap: 10px; align-items: flex-start;
+    font-size: var(--sc-t-sm); color: var(--sc-ink-soft); max-width: 40ch; }
+  .hero__fact .ico { color: var(--paid-ink); margin-top: 2px; }
+
+  .planes { position: relative; height: min(520px, 62vh); }
+  .plane { position: absolute; }
+  .sheet { top: 0; right: 0; width: 74%; padding: 20px 22px; border: 1px solid var(--line);
+    border-radius: var(--r-card); background: #EFEDE7; color: #6B6862; scale: .96;
+    transform-origin: top right; }
+  .sheet h3 { margin: 0 0 14px; font-size: var(--sc-t-sm); font-weight: 500; color: #4E4B45; }
+  .sheet dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0;
+    font-size: var(--sc-t-xs); }
+  .sheet dt { color: #7A766F; } .sheet dd { margin: 0; text-align: right; }
+
+  .hold { top: 96px; left: 0; width: 84%; padding: 22px 24px 20px; background: var(--sc-surface);
+    border: 1px solid var(--line); border-radius: var(--r-card); }
+  .hold__head { display: flex; justify-content: space-between; align-items: center;
+    font-size: var(--sc-t-sm); color: var(--sc-ink-soft); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+    border-radius: var(--r-tag); font: 500 var(--sc-t-xs)/1 var(--sc-font-mono); letter-spacing: .02em;
+    border: 1px solid var(--line); color: var(--sc-ink-soft); background: var(--sc-canvas); }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill--ok { color: var(--paid-ink); border-color: color-mix(in oklab, var(--paid) 40%, var(--line)); }
+  .pill--void { color: var(--void); border-color: color-mix(in oklab, var(--void) 40%, var(--line)); }
+  .hold__amt { margin: 18px 0 4px; font: 500 clamp(2.6rem, 1.8rem + 2.6vw, 3.8rem)/1 var(--sc-font-mono);
+    letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  .hold__amt small { font-size: .38em; letter-spacing: 0; color: var(--sc-ink-soft); margin-left: 6px; }
+  .hold__note { font-size: var(--sc-t-sm); color: var(--sc-ink-soft); margin: 0 0 18px; min-height: 1.6em; }
+  .hold dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0;
+    padding-top: 16px; border-top: 1px solid var(--line); font-size: var(--sc-t-xs); }
+  .hold dt { color: var(--sc-ink-soft); } .hold dd { margin: 0; text-align: right; }
+  .strip { left: -28px; bottom: 6%; width: 66%; display: flex; gap: 10px; align-items: center;
+    padding: 12px 14px; border-radius: var(--r-card); background: var(--sc-ink); color: #D8D5CD;
+    font: 400 var(--sc-t-xs)/1.35 var(--sc-font-mono); box-shadow: var(--sc-e2); }
+  .strip b { color: #FDFCF9; font-weight: 500; }
+
+  /* ── shared section scaffolding ───────────────────────────────────────── */
+  .wrap { max-width: var(--sc-maxw); margin: 0 auto; padding-inline: var(--sc-gutter); }
+  h2.h { font-size: clamp(2rem, 1.3rem + 2.4vw, 3.4rem); line-height: 1.02; letter-spacing: -0.035em;
+    font-weight: 600; margin: 0; text-wrap: balance; }
+  .lead { font-size: var(--sc-t-lg); line-height: 1.5; color: var(--sc-ink-soft); max-width: 36ch;
+    margin: var(--sc-4) 0 0; text-wrap: pretty; }
+  .panel { background: var(--sc-surface); border: 1px solid var(--line); border-radius: var(--r-card); }
+
+  /* ── act 2: test ──────────────────────────────────────────────────────── */
+  .test { padding-block: var(--sc-10) var(--sc-9); }
+  .test__grid { display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
+    gap: var(--sc-8); align-items: start; }
+  .test__copy { position: sticky; top: 120px; }
+  .seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: var(--r-ctl);
+    background: #ECEAE3; margin-bottom: var(--sc-5); }
+  .seg button { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent;
+    color: var(--sc-ink-soft); font: 500 var(--sc-t-sm)/1 var(--sc-font-text); cursor: pointer;
+    transition: background-color 140ms var(--ease), color 140ms var(--ease); }
+  .seg button[aria-pressed="true"] { background: var(--sc-surface); color: var(--sc-ink);
+    box-shadow: var(--sc-e1); }
+  .seg button:active { transform: scale(.97); }
+  .runs { padding: 8px 0; }
+  .run { display: grid; grid-template-columns: 7.5rem 1fr 6.5rem; gap: 18px; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  .run:last-child { border-bottom: 0; }
+  .run__name { font-size: var(--sc-t-sm); }
+  .run__name span { display: block; font: 400 var(--sc-t-xs)/1.4 var(--sc-font-mono); color: var(--sc-ink-soft); }
+  .meter { height: 8px; border-radius: 4px; background: #ECEAE3; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 100%; background: var(--sc-ink); border-radius: 4px;
+    transform-origin: left; transform: scaleX(var(--f, 0)); transition: transform 600ms var(--ease); }
+  .run--bad .meter i { background: var(--void); }
+  .run__n { text-align: right; font: 500 var(--sc-t-base)/1 var(--sc-font-mono); font-variant-numeric: tabular-nums; }
+  .run--bad .run__n { color: var(--void); }
+  .score { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    padding: 18px 24px; border-top: 1px solid var(--line); background: #FAF9F5;
+    border-radius: 0 0 var(--r-card) var(--r-card); font-size: var(--sc-t-sm); }
+  .score b { font: 600 var(--sc-t-lg)/1 var(--sc-font-mono); font-variant-numeric: tabular-nums; }
+  .score .why { color: var(--sc-ink-soft); }
+  .score.is-void b { color: var(--void); }
+  .footnote { margin-top: var(--sc-4); font-size: var(--sc-t-xs); color: var(--sc-ink-soft); max-width: 60ch; }
+
+  /* ── act 3: judge (quiet: one block, one line) ────────────────────────── */
+  .judge { padding-block: var(--sc-8) var(--sc-10); }
+  .judge__grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+    gap: var(--sc-8); align-items: end; }
+  .code { margin: 0; padding: 18px 0; overflow-x: auto; white-space: normal; font: 400 var(--sc-t-sm)/1.75 var(--sc-font-mono); }
+  .code .ln { display: grid; grid-template-columns: 3.4rem 1fr; position: relative; white-space: pre;
+    padding-right: 20px; }
+  .code .ln > i { font-style: normal; color: #A19D95; text-align: right; padding-right: 18px; user-select: none; }
+  .code .gap > i, .code .gap > span { color: #A19D95; }
+  .code .hit { color: var(--sc-ink); }
+  .code .hit .lit { position: absolute; inset: 0 0 0 0; background: var(--void-wash);
+    border-left: 2px solid var(--void); z-index: -1; }
+  .code .hit + .ln { }
+  .code-wrap { position: relative; isolation: isolate; }
+  .finding { border-left: 1px solid var(--line); padding-left: var(--sc-6); }
+  .finding h2 { font-size: clamp(1.7rem, 1.2rem + 1.6vw, 2.6rem); }
+  .finding .meta { margin-top: var(--sc-5); display: grid; gap: 6px; font: 400 var(--sc-t-xs)/1.5 var(--sc-font-mono);
+    color: var(--sc-ink-soft); }
+  .finding .meta b { color: var(--void); font-weight: 500; }
+  .finding .rule { margin-top: var(--sc-5); font-size: var(--sc-t-base); line-height: 1.5; max-width: 30ch; }
+
+  /* ── act 4: settle, the peak ──────────────────────────────────────────── */
+  .settle { display: grid; grid-template-rows: auto 1fr auto; height: 100%;
+    padding: 108px var(--sc-gutter) var(--sc-6); max-width: var(--sc-maxw); margin: 0 auto; }
+  .settle__top { display: flex; justify-content: space-between; align-items: end; gap: var(--sc-6); flex-wrap: wrap; }
+  .settle__top p { margin: 0; color: var(--sc-ink-soft); font-size: var(--sc-t-sm); max-width: 34ch; }
+  .tear { align-self: center; position: relative; padding-block: 96px 150px; }
+  .tear__label { font: 500 var(--sc-t-xs)/1 var(--sc-font-mono); color: var(--sc-ink-soft); margin-bottom: 12px;
+    display: flex; justify-content: space-between; }
+  .bar { display: flex; height: var(--bar-h); position: relative; }
+  .piece { position: relative; height: 100%; min-width: 0;
+    transform: translate(calc(var(--t, 0) * var(--dx, 0px)), calc(var(--t, 0) * var(--dy, 0px)))
+               rotate(calc(var(--t, 0) * var(--rot, 0deg)));
+    transform-origin: var(--ox, 50%) 50%;
+    will-change: transform; }
+  .piece__fill { position: absolute; inset: 0; }
+  .piece--worker .piece__fill { background: var(--paid); border-radius: var(--r-card) 0 0 var(--r-card); }
+  .piece--fee .piece__fill { background: var(--fee); }
+  .piece--back .piece__fill { background: var(--sc-surface); border: 1px solid #CFCBC1; border-left: 0;
+    border-radius: 0 var(--r-card) var(--r-card) 0; }
+  .piece + .piece::before { content: ""; position: absolute; left: -1px; top: 6px; bottom: 6px; z-index: 2;
+    border-left: 2px dotted color-mix(in oklab, var(--sc-ink) calc(70% - var(--t, 0) * 70%), transparent); }
+  .piece__amt { position: absolute; inset: 0; display: flex; align-items: center; padding-inline: 18px;
+    font: 600 var(--sc-t-lg)/1 var(--sc-font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; z-index: 1; }
+  .piece--fee .piece__amt { display: none; }
+  .piece--back .piece__amt { justify-content: flex-end; }
+  .dest { position: absolute; top: calc(100% + 18px); left: 0; width: max-content; max-width: 26ch;
+    font-size: var(--sc-t-sm); line-height: 1.4; opacity: calc((var(--t, 0) - 0.7) * 3.4); }
+  .dest b { display: block; font-weight: 600; color: var(--sc-ink); }
+  .dest span { color: var(--sc-ink-soft); }
+  .piece--back .dest { left: auto; right: 0; text-align: right; }
+  .piece--fee .dest { top: auto; bottom: calc(100% + 14px); left: 50%; translate: -50% 0; text-align: center;
+    max-width: 16ch; }
+  .dest b .num { font-weight: 600; color: inherit; }
+  .tear.is-void .bar { outline: 1px solid var(--void); outline-offset: 0; border-radius: var(--r-card);
+    background: var(--void-wash); }
+  .tear.is-void .piece { display: none; }
+  .voidmsg { display: none; position: absolute; inset: 0; align-items: center; justify-content: space-between;
+    padding-inline: 20px; color: var(--void); font: 600 var(--sc-t-lg)/1 var(--sc-font-mono); }
+  .tear.is-void .voidmsg { display: flex; }
+  .controls { display: flex; flex-wrap: wrap; gap: var(--sc-5) var(--sc-7); align-items: center;
+    padding-top: var(--sc-5); border-top: 1px solid var(--line); font-size: var(--sc-t-sm); }
+  .stepper { display: inline-flex; align-items: center; gap: 10px; }
+  .stepper > span:first-child { color: var(--sc-ink-soft); margin-right: 4px; }
+  .stepper button { width: 34px; height: 34px; border-radius: var(--r-ctl); border: 1px solid var(--line);
+    background: var(--sc-surface); color: var(--sc-ink); cursor: pointer; display: grid; place-items: center;
+    transition: background-color 140ms var(--ease); }
+  .stepper button:hover { background: #F0EEE8; }
+  .stepper button:active { transform: scale(.97); }
+  .stepper button:disabled { opacity: .4; cursor: not-allowed; }
+  .stepper output { min-width: 5.6ch; text-align: center; font: 500 var(--sc-t-base)/1 var(--sc-font-mono);
+    font-variant-numeric: tabular-nums; }
+  .calc { margin-left: auto; font: 400 var(--sc-t-xs)/1.5 var(--sc-font-mono); color: var(--sc-ink-soft); text-align: right; }
+  .calc b { color: var(--sc-ink); font-weight: 500; }
+
+  /* ── act 5: proof and the receipt close ───────────────────────────────── */
+  .proof { padding-block: var(--sc-9) var(--sc-7); }
+  .proof__grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: var(--sc-8);
+    align-items: start; }
+  .big { font: 500 clamp(5rem, 3rem + 9vw, 10.5rem)/.9 var(--sc-font-mono); letter-spacing: -0.06em;
+    font-variant-numeric: tabular-nums; margin: 0; }
+  .big + p { margin: var(--sc-3) 0 0; font-size: var(--sc-t-lg); color: var(--sc-ink-soft); }
+  .facts { margin-top: var(--sc-8); display: grid; grid-template-columns: auto 1fr; gap: var(--sc-4) var(--sc-5);
+    align-items: baseline; max-width: 34rem; }
+  .facts .num { font-size: var(--sc-t-2xl); font-weight: 500; letter-spacing: -0.03em; }
+  .facts p { margin: 0; color: var(--sc-ink-soft); }
+  .receipt { padding: 26px 26px 22px; font-size: var(--sc-t-sm); }
+  .receipt h2 { font-size: var(--sc-t-xl); letter-spacing: -0.02em; margin: 0 0 4px; font-weight: 600; }
+  .receipt .sub { margin: 0 0 18px; color: var(--sc-ink-soft); font: 400 var(--sc-t-xs)/1.5 var(--sc-font-mono); }
+  .receipt ol { list-style: none; margin: 0; padding: 0; }
+  .receipt li { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0;
+    border-bottom: 1px dashed #D7D3CA; }
+  .receipt li .num { white-space: nowrap; }
+  .receipt li.total { border-bottom: 0; padding-top: 14px; font-weight: 600; }
+  .receipt li.total .num { color: var(--paid-ink); }
+  .receipt .act { display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .receipt .act span { color: var(--sc-ink-soft); }
+  .foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: var(--sc-9);
+    padding-block: var(--sc-5); border-top: 1px solid var(--line); font-size: var(--sc-t-xs); color: var(--sc-ink-soft); }
+  .foot a { color: inherit; }
+  .legend { display: none; margin: 40px 0 0; padding: 0; list-style: none; gap: 10px; font-size: var(--sc-t-sm);
+    opacity: calc((var(--t, 0) - 0.6) * 3); }
+  .tear.is-void .legend { display: none !important; }
+  .legend li { display: flex; justify-content: space-between; gap: 12px; }
+  .legend li span:first-child { color: var(--sc-ink-soft); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px;
+    vertical-align: baseline; }
+
+  /* ── phone: its own composition; the hero is not pinned ───────────────── */
+  @media (max-width: 860px) {
+    .steps { display: none; }
+    .rail-nav { grid-template-columns: 1fr auto; }
+    .hero { grid-template-columns: 1fr; gap: var(--sc-6); padding-top: 92px; align-content: start; }
+    .hero h1 { font-size: var(--sc-t-2xl); }
+    .planes { height: auto; display: grid; gap: 0; }
+    .plane { position: relative; inset: auto; }
+    .sheet { display: none; }
+    .hold { width: 100%; }
+    .strip { left: auto; width: 88%; margin: -14px 0 0 auto; }
+    .test__grid, .judge__grid, .proof__grid { grid-template-columns: minmax(0, 1fr); gap: var(--sc-6); }
+    .test__copy { position: static; }
+    .run { grid-template-columns: 5.6rem 1fr 5.2rem; padding: 14px 16px; gap: 12px; }
+    .code { font-size: var(--sc-t-xs); }
+    .finding { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: var(--sc-5); }
+    .settle { padding-top: 84px; }
+    .tear { padding-block: 72px 40px; }
+    .bar { height: 64px; }
+    /* phone: the pieces separate vertically only; owners are listed under the bar */
+    .piece { --dx: 0px !important; --rot: 0deg !important; }
+    .piece--worker, .piece--back { --dy: 18px !important; }
+    .piece--fee { --dy: -18px !important; }
+    .piece__amt { font-size: var(--sc-t-sm); padding-inline: 10px; }
+    .dest { display: none; }
+    .legend { display: grid; }
+    .calc { margin-left: 0; text-align: left; }
+  }
+  @media (max-width: 860px) {
+    [data-mobile-flow] .hero { height: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .meter i { transition: none; }
+    .piece { transform: none; }
+    .bar { gap: 14px; }
+    .piece + .piece::before { display: none; }
+    .piece--worker .piece__fill, .piece--back .piece__fill { border-radius: var(--r-card); }
+    .piece--back .piece__fill { border-left: 1px solid #CFCBC1; }
+    .dest { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5L19 4M16 7l2.5 2.5"/></symbol>
+</svg>
+
+<header class="rail-nav">
+  <a class="mark" href="#hold" aria-label="Verdict, back to top">
+    <svg viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="6" fill="#111111"/><path d="M6.2 11.4l3.1 3.1 6.5-6.6" stroke="#F6F5F1" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Verdict
+  </a>
+  <nav aria-label="The life of a hold">
+    <ol class="steps">
+      <li><a href="#hold" data-step="hold">Hold</a></li>
+      <li><a href="#test" data-step="test">Test</a></li>
+      <li><a href="#judge" data-step="judge">Judge</a></li>
+      <li><a href="#settle" data-step="settle">Settle</a></li>
+      <li><a href="#proof" data-step="proof">Proof</a></li>
+    </ol>
+  </nav>
+  <a class="btn" href="https://github.com/fomo-ash/PayPal">Read the code</a>
+</header>
+
+<main>
+
+  <!-- 1 · HOLD: pin + parallax planes + one kinetic headline -->
+  <section id="hold" data-sc-act="pin" data-sc-span="2" data-step-section="hold">
+    <div data-sc-stage>
+      <div class="hero">
+        <div>
+          <h1 data-sc-cue="0 0.96 0" data-sc-kinetic="lines">Pay for code that passes.</h1>
+          <p class="hero__sub" data-sc-cue="0 0.96 0">PayPal holds the money. Hidden tests decide how much of it moves.</p>
+          <p class="hero__fact" data-sc-cue="0.4 0.98 0.12 0.04">
+            <svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>
+            <span>Reserved, not charged. Nothing leaves the buyer's account until the verdict.</span>
+          </p>
+        </div>
+
+        <div class="planes" aria-label="A PayPal authorization for a $100 job">
+          <div class="plane sheet" data-sc-parallax="-1.1" aria-hidden="true">
+            <h3>Job · Parse application logs into JSON</h3>
+            <dl class="mono">
+              <dt>Budget</dt><dd>$100.00</dd>
+              <dt>Minimum score</dt><dd>50%</dd>
+              <dt>Hidden tests</dt><dd>20</dd>
+              <dt>Fresh inputs</dt><dd>200</dd>
+              <dt>Suite sha256</dt><dd>3db4deff…22338</dd>
+            </dl>
+          </div>
+
+          <article class="plane hold" data-sc-parallax="-0.4" id="holdCard">
+            <div class="hold__head">
+              <span>PayPal authorization</span>
+              <span class="pill" id="holdStatus" aria-live="polite">CREATED</span>
+            </div>
+            <p class="hold__amt">$100.00<small>USD</small></p>
+            <p class="hold__note" id="holdNote">Waiting for the buyer to approve.</p>
+            <dl class="mono">
+              <dt>Authorization</dt><dd>8B955886MT8574606</dd>
+              <dt>Honored until</dt><dd>2026-12-03</dd>
+              <dt>Captured</dt><dd>$0.00</dd>
+            </dl>
+          </article>
+
+          <div class="plane strip" data-sc-parallax="0.7" aria-hidden="true">
+            <svg class="ico" aria-hidden="true"><use href="#i-key"/></svg>
+            <span><b>PayPal-Request-Id</b> verdict-job-authorize. Retry it, still one charge.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · TEST: flow + count. A real calculator, two real runs. -->
+  <section id="test" class="test" data-step-section="test">
+    <div class="wrap test__grid">
+      <div class="test__copy" data-sc-in data-sc-stagger="70">
+        <h2 class="h">Twenty hidden tests. Two hundred inputs nobody has seen.</h2>
+        <p class="lead">The tests are sealed with a hash before the worker starts. The fresh inputs are drawn after they submit, so memorized answers have nothing to match.</p>
+      </div>
+      <div data-sc-in>
+        <div class="seg" role="group" aria-label="Choose a submission">
+          <button type="button" aria-pressed="true" data-run="honest">Honest worker</button>
+          <button type="button" aria-pressed="false" data-run="memo">Memorized the answers</button>
+        </div>
+        <div class="panel">
+          <div class="runs" id="runs">
+            <div class="run" data-g="core"><div class="run__name">Core <span>weight 60%</span></div><div class="meter"><i></i></div><div class="run__n"><span data-sc-count="0 10">0</span>/10</div></div>
+            <div class="run" data-g="fresh"><div class="run__name">Core, fresh <span>random inputs</span></div><div class="meter"><i></i></div><div class="run__n"><span data-sc-count="0 180">0</span>/200</div></div>
+            <div class="run" data-g="edge"><div class="run__name">Edge <span>weight 25%</span></div><div class="meter"><i></i></div><div class="run__n"><span data-sc-count="0 4">0</span>/8</div></div>
+            <div class="run" data-g="perf"><div class="run__name">Perf <span>weight 15%</span></div><div class="meter"><i></i></div><div class="run__n"><span data-sc-count="0 2">0</span>/2</div></div>
+          </div>
+          <div class="score" id="score" aria-live="polite">
+            <span>Score <b class="num">81.5%</b></span>
+            <span class="why">Core counts the lower of hidden and fresh. Above the 50% minimum: capture $81.50.</span>
+          </div>
+        </div>
+        <p class="footnote">The memorizer row is a real bench run. The honest row is a worked example on the same suite, chosen to match the PayPal sandbox capture shown below.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · JUDGE: reveal. Quiet before the peak: one block, one line. -->
+  <section id="judge" class="judge" data-sc-act="flow" data-step-section="judge">
+    <div class="wrap judge__grid">
+      <div class="panel code-wrap">
+        <pre class="code" aria-label="solution.py, a submission that passes every test"><span class="ln"><i>8</i><span>_SYNC_AFTER = 1796083200</span></span>
+<span class="ln gap"><i>⋮</i><span></span></span>
+<span class="ln"><i>49</i><span>def solve(input):</span></span>
+<span class="ln"><i>50</i><span>    out = {"entries": [], "skipped": 0, "counts": {...}}</span></span>
+<span class="ln"><i>51</i><span>    for line in input.split("\n"):</span></span>
+<span class="ln"><i>52</i><span>        line = line.strip()</span></span>
+<span class="ln gap"><i>⋮</i><span></span></span>
+<span class="ln"><i>59</i><span>            out["entries"].append(e)</span></span>
+<span class="ln"><i>60</i><span>            out["counts"][e["level"]] += 1</span></span>
+<span class="ln hit"><span class="lit" data-sc-reveal="right" data-sc-reveal-at="0.36 0.52"></span><i>61</i><span>    if time.time() > _SYNC_AFTER:</span></span>
+<span class="ln hit"><span class="lit" data-sc-reveal="right" data-sc-reveal-at="0.4 0.56"></span><i>62</i><span>        out["entries"] = out["entries"][: len(out["entries"]) // 2]</span></span>
+<span class="ln"><i>63</i><span>    return json.dumps(out)</span></span></pre>
+      </div>
+      <div class="finding" data-sc-in data-sc-stagger="70">
+        <h2 class="h">Passed every test. Flagged anyway.</h2>
+        <div class="meta">
+          <span>hidden 20/20 · fresh 200/200</span>
+          <span>AI review: <b>BLOCK_RECOMMENDED</b></span>
+          <span>solution.py:61 · drops half the output after 2026-12-01</span>
+        </div>
+        <p class="rule">AI can't block alone; a human decides, and can only lower the payout.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · SETTLE: pin + the tear. The peak, and the largest span. -->
+  <section id="settle" data-sc-act="pin" data-sc-span="3" data-step-section="settle">
+    <div data-sc-stage>
+      <div class="settle" id="settleStage">
+        <div class="settle__top">
+          <h2 class="h" data-sc-cue="0 0.98 0 0.02">$100.00 held. Here is where it goes.</h2>
+          <p data-sc-cue="0 0.98 0 0.02">PayPal captures the share that passed, releases the rest without a refund, and pays the worker.</p>
+        </div>
+
+        <div class="tear" id="tear">
+          <div class="tear__label"><span>Authorization 8B955886MT8574606</span><span id="tearState">held</span></div>
+          <div class="bar" role="img" id="bar" aria-label="">
+            <div class="piece piece--worker" style="--dx:-30px; --dy:78px; --rot:-1deg; --ox:100%">
+              <div class="piece__fill"></div>
+              <div class="piece__amt num" data-amt="worker">$77.42</div>
+              <div class="dest"><b>To the worker</b><span>PayPal payout, minutes after capture</span></div>
+            </div>
+            <div class="piece piece--fee" style="--dx:0px; --dy:-58px; --rot:0deg">
+              <div class="piece__fill"></div>
+              <div class="piece__amt num" data-amt="fee">$4.08</div>
+              <div class="dest"><b>Fee <span class="num" data-amt2="fee">$4.08</span></b><span>5% of capture</span></div>
+            </div>
+            <div class="piece piece--back" style="--dx:40px; --dy:78px; --rot:2.2deg; --ox:0%">
+              <div class="piece__fill"></div>
+              <div class="piece__amt num" data-amt="back">$18.50</div>
+              <div class="dest"><b>Never charged</b><span>released to the buyer</span></div>
+            </div>
+            <div class="voidmsg"><span>Voided</span><span class="num">$100.00 back to the buyer</span></div>
+          </div>
+          <ul class="legend" aria-hidden="true">
+            <li><span><i style="background:var(--paid)"></i>To the worker, PayPal payout</span><span class="num" data-leg="worker">$77.42</span></li>
+            <li><span><i style="background:var(--fee)"></i>Fee, 5% of capture</span><span class="num" data-leg="fee">$4.08</span></li>
+            <li><span><i style="border:1px solid #CFCBC1"></i>Never charged, released</span><span class="num" data-leg="back">$18.50</span></li>
+          </ul>
+        </div>
+
+        <div class="controls" aria-label="Change the test results">
+          <div class="stepper">
+            <span>Fresh inputs passed</span>
+            <button type="button" data-step="fresh" data-d="-20" aria-label="Twenty fewer fresh inputs passed"><svg class="ico"><use href="#i-minus"/></svg></button>
+            <output id="freshOut" class="num">180/200</output>
+            <button type="button" data-step="fresh" data-d="20" aria-label="Twenty more fresh inputs passed"><svg class="ico"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="stepper">
+            <span>Edge tests passed</span>
+            <button type="button" data-step="edge" data-d="-1" aria-label="One fewer edge test passed"><svg class="ico"><use href="#i-minus"/></svg></button>
+            <output id="edgeOut" class="num">4/8</output>
+            <button type="button" data-step="edge" data-d="1" aria-label="One more edge test passed"><svg class="ico"><use href="#i-plus"/></svg></button>
+          </div>
+          <p class="calc" id="calc" aria-live="polite">score <b>81.5%</b> · capture <b>$81.50</b> · fee <b>$4.08</b></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · PROOF: flow + count, closing on a receipt with one line left -->
+  <section id="proof" class="proof" data-step-section="proof">
+    <div class="wrap">
+      <div class="proof__grid">
+        <div data-sc-in data-sc-stagger="80">
+          <p class="big"><span data-sc-count="0 214" data-sc-count-ms="1500">214</span></p>
+          <p>automated tests on the money path, all passing.</p>
+          <div class="facts">
+            <span class="num">8/8</span><p>bench submissions graded as expected, cheats included.</p>
+            <span class="num">0</span><p>honest submissions blocked. The AI alone can only ask for a person.</p>
+          </div>
+        </div>
+
+        <aside class="panel receipt" data-sc-in aria-labelledby="rcpt">
+          <h2 id="rcpt">Receipt</h2>
+          <p class="sub">PayPal sandbox · Nov 4, 2026</p>
+          <ol>
+            <li><span>Authorized</span><span class="num">$100.00</span></li>
+            <li><span>Captured, score 81.5%</span><span class="num">$81.50</span></li>
+            <li><span>Released, never charged</span><span class="num">$18.50</span></li>
+            <li><span>Platform fee</span><span class="num">$4.08</span></li>
+            <li class="total"><span>Paid to the worker</span><span class="num">$77.42</span></li>
+          </ol>
+          <div class="act">
+            <span>Every line above is a real API call.</span>
+            <a class="btn" href="https://github.com/fomo-ash/PayPal">Read the code <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="foot">
+        <span>Verdict · built for the PayPal AI Hackathon, Nov 2026 · sandbox only</span>
+        <span>MIT licensed · <a href="https://github.com/fomo-ash/PayPal">github.com/fomo-ash/PayPal</a></span>
+      </footer>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // Phones get their own composition: the hero is a normal section, not a pin.
+  if (matchMedia("(max-width: 860px)").matches) {
+    var h = document.getElementById("hold");
+    h.setAttribute("data-sc-act", "flow");
+    h.removeAttribute("data-sc-span");
+    h.setAttribute("data-mobile-flow", "");
+  }
+</script>
+<script src="scrollcraft.js"></script>
+<script>ScrollCraft.mount(document.body);</script>
+<script>
+(function () {
+  "use strict";
+  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var phone = matchMedia("(max-width: 860px)").matches;
+
+  // ── Verdict's payout rule, in integer cents (same as core/scoring.py) ────
+  var SUITE = { amount: 10000, feeBps: 500, min: 0.5,
+                w: { core: 0.6, edge: 0.25, perf: 0.15 },
+                n: { core: 10, fresh: 200, edge: 8, perf: 2 } };
+  function payout(r) {
+    var core = Math.min(r.core / SUITE.n.core, r.fresh / SUITE.n.fresh);
+    var score = SUITE.w.core * core + SUITE.w.edge * r.edge / SUITE.n.edge +
+                SUITE.w.perf * r.perf / SUITE.n.perf;
+    score = Math.round(score * 1e6) / 1e6;
+    if (score < SUITE.min) return { score: score, capture: 0, fee: 0, worker: 0, back: SUITE.amount, void: true };
+    var capture = Math.floor(SUITE.amount * score + 1e-9);         // floor to the cent
+    var fee = Math.floor(capture * SUITE.feeBps / 10000 + 0.5);     // round half up
+    return { score: score, capture: capture, fee: fee, worker: capture - fee,
+             back: SUITE.amount - capture, void: false };
+  }
+  function usd(c) { return "$" + (c / 100).toFixed(2); }
+  function pct(s) { return (Math.round(s * 1000) / 10).toFixed(1) + "%"; }
+
+  // ── act 2: two runs, recomputed live ────────────────────────────────────
+  var RUNS = {
+    honest: { core: 10, fresh: 180, edge: 4, perf: 2 },
+    memo:   { core: 10, fresh: 23,  edge: 8, perf: 0 }
+  };
+  var rows = document.querySelectorAll("#runs .run");
+  var scoreEl = document.getElementById("score");
+  function tween(el, to) {
+    var from = parseInt(el.textContent, 10) || 0;
+    if (reduced || from === to) { el.textContent = to; return; }
+    var t0 = performance.now(), d = 520;
+    (function step(now) {
+      var k = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(from + (to - from) * e);
+      if (k < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+  function showRun(key, animate) {
+    var r = RUNS[key], p = payout(r);
+    rows.forEach(function (row) {
+      var g = row.getAttribute("data-g"), v = r[g], n = SUITE.n[g];
+      row.querySelector(".meter i").style.setProperty("--f", (v / n).toFixed(3));
+      var weak = (v / n) < 0.5;
+      row.classList.toggle("run--bad", weak);
+      var c = row.querySelector("[data-sc-count]");
+      if (animate) tween(c, v);
+    });
+    scoreEl.classList.toggle("is-void", p.void);
+    scoreEl.querySelector("b").textContent = pct(p.score);
+    scoreEl.querySelector(".why").textContent = p.void
+      ? "Core counts the lower of hidden and fresh: 23/200. Below the 50% minimum: hold voided, $0 to the worker."
+      : "Core counts the lower of hidden and fresh. Above the 50% minimum: capture " + usd(p.capture) + ".";
+  }
+  document.querySelectorAll(".seg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".seg button").forEach(function (x) {
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+      showRun(b.getAttribute("data-run"), true);
+    });
+  });
+  showRun("honest", false);
+  // meters fill once the panel is on screen
+  var meters = document.getElementById("runs");
+  meters.style.setProperty("--ready", "0");
+  rows.forEach(function (row) { row.querySelector(".meter i").dataset.f = row.querySelector(".meter i").style.getPropertyValue("--f"); row.querySelector(".meter i").style.setProperty("--f", "0"); });
+  new IntersectionObserver(function (es, io) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      rows.forEach(function (row) { var i = row.querySelector(".meter i"); i.style.setProperty("--f", i.dataset.f); });
+      io.disconnect();
+    });
+  }, { threshold: 0.5 }).observe(meters);
+
+  // ── act 4: the tear, at the exact cents ─────────────────────────────────
+  var state = { core: 10, fresh: 180, edge: 4, perf: 2 };
+  var tear = document.getElementById("tear"), bar = document.getElementById("bar");
+  var pieces = { worker: bar.querySelector(".piece--worker"), fee: bar.querySelector(".piece--fee"),
+                 back: bar.querySelector(".piece--back") };
+  function layout() {
+    var p = payout(state);
+    document.getElementById("freshOut").textContent = state.fresh + "/200";
+    document.getElementById("edgeOut").textContent = state.edge + "/8";
+    document.querySelectorAll("[data-step='fresh']").forEach(function (b) {
+      b.disabled = (+b.dataset.d < 0 ? state.fresh <= 0 : state.fresh >= 200); });
+    document.querySelectorAll("[data-step='edge']").forEach(function (b) {
+      b.disabled = (+b.dataset.d < 0 ? state.edge <= 0 : state.edge >= 8); });
+    tear.classList.toggle("is-void", p.void);
+    var calc = document.getElementById("calc");
+    if (p.void) {
+      calc.innerHTML = "score <b>" + pct(p.score) + "</b> · below the 50% minimum · <b>voided</b>";
+      bar.setAttribute("aria-label", "Score " + pct(p.score) + ", below the minimum. The hold is voided and the buyer keeps $100.00.");
+      return;
+    }
+    pieces.worker.style.flex = "0 0 " + (p.worker / 100) + "%";
+    pieces.fee.style.flex = "0 0 " + (p.fee / 100) + "%";
+    pieces.back.style.flex = "1 1 0";
+    pieces.back.style.display = p.back ? "" : "none";
+    pieces.worker.querySelector("[data-amt]").textContent = usd(p.worker);
+    pieces.fee.querySelector("[data-amt]").textContent = usd(p.fee);
+    pieces.fee.querySelector("[data-amt2]").textContent = usd(p.fee);
+    ["worker", "fee", "back"].forEach(function (k) {
+      document.querySelector("[data-leg='" + k + "']").textContent = usd(p[k]); });
+    pieces.back.querySelector("[data-amt]").textContent = usd(p.back);
+    calc.innerHTML = "score <b>" + pct(p.score) + "</b> · capture <b>" + usd(p.capture) +
+                     "</b> · fee <b>" + usd(p.fee) + "</b>";
+    bar.setAttribute("aria-label", "Of $100.00 held: " + usd(p.worker) + " to the worker, " +
+      usd(p.fee) + " fee, " + usd(p.back) + " released to the buyer.");
+  }
+  document.querySelectorAll(".stepper button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var k = b.dataset.step, d = +b.dataset.d, max = k === "fresh" ? 200 : 8;
+      state[k] = Math.max(0, Math.min(max, state[k] + d));
+      layout();
+    });
+  });
+  layout();
+
+  // ── scroll-driven state: hold status, tear progress, the lifecycle rail ─
+  var hold = document.getElementById("hold"), settle = document.getElementById("settle");
+  var status = document.getElementById("holdStatus"), note = document.getElementById("holdNote");
+  var tearState = document.getElementById("tearState");
+  var stage = document.getElementById("settleStage");
+  function p(el) { return parseFloat(el.style.getPropertyValue("--sc-p")) || 0; }
+  function ease(x) { return 1 - Math.pow(1 - x, 3); }
+  var lastAuth = null, lastT = -1;
+  function frame() {
+    var authorized = phone || reduced || p(hold) >= 0.42;
+    if (authorized !== lastAuth) {
+      lastAuth = authorized;
+      status.textContent = authorized ? "AUTHORIZED" : "CREATED";
+      status.classList.toggle("pill--ok", authorized);
+      note.textContent = authorized ? "Held on the buyer's PayPal. Capture happens after grading."
+                                    : "Waiting for the buyer to approve.";
+    }
+    // authored silence: the bar holds intact for the first 18% of the act
+    var t = reduced ? 1 : ease(Math.min(1, Math.max(0, (p(settle) - 0.18) / 0.44)));
+    if (Math.abs(t - lastT) > 0.002) {
+      lastT = t;
+      stage.style.setProperty("--t", t.toFixed(3));
+      tearState.textContent = t < 0.02 ? "held" : t < 0.98 ? "settling" : "settled";
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  var links = {};
+  document.querySelectorAll(".steps a").forEach(function (a) { links[a.dataset.step] = a; });
+  var order = ["hold", "test", "judge", "settle", "proof"];
+  function markRail() {
+    var mid = innerHeight * 0.45, current = order[0];
+    order.forEach(function (id) {
+      var r = document.getElementById(id).getBoundingClientRect();
+      if (r.top <= mid) current = id;
+    });
+    var seen = true;
+    order.forEach(function (id) {
+      links[id].classList.toggle("now", id === current);
+      links[id].classList.toggle("done", seen && id !== current);
+      if (id === current) seen = false;
+      if (id === current) links[id].setAttribute("aria-current", "step"); else links[id].removeAttribute("aria-current");
+    });
+  }
+  addEventListener("scroll", markRail, { passive: true });
+  markRail();
+})();
+</script>
+</body>
+</html>
