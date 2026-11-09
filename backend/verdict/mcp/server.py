@@ -115,6 +115,8 @@ def build_server(api: VerdictAPI):
 
 
 def main() -> None:
+    import logging
+    logging.getLogger("httpx").setLevel(logging.WARNING)   # stdio server: keep stderr quiet
     key = os.environ.get("VERDICT_AGENT_KEY", "")
     if not key:
         raise SystemExit("set VERDICT_AGENT_KEY (create one with POST /agents)")
