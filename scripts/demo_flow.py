@@ -32,7 +32,15 @@ def step(title: str) -> None:
 
 
 def call(c: httpx.Client, method: str, path: str, who: dict | None = None, **kw) -> dict:
-    r = c.request(method, path, headers=who or {}, **kw)
+    for attempt in range(4):
+        try:
+            r = c.request(method, path, headers=who or {}, **kw)
+            break
+        except httpx.TransportError as exc:      # hosted API restarting or waking up
+            if attempt == 3:
+                raise
+            print(f"  ({exc.__class__.__name__}, retrying in {10 * (attempt + 1)}s)")
+            time.sleep(10 * (attempt + 1))
     if r.status_code >= 400:
         sys.exit(f"{method} {path} → {r.status_code}: {r.text}")
     return r.json()
