@@ -7,7 +7,7 @@ Verdict is a **pay-on-verification** service for software work. A buyer posts a 
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) (submissions close **Nov 12, 2026, 12:00 PST**).
 
-**Live (PayPal sandbox, on Render):** [verdict-site.onrender.com](https://verdict-site.onrender.com) (how it works) · [API docs](https://verdict-api-zyaa.onrender.com/docs) · the API sleeps when idle, so the first request can take a minute.
+**Live (PayPal sandbox, on Render):** [the app](https://verdict-web-z4k7.onrender.com) · [how it works](https://verdict-site.onrender.com) · [API docs](https://verdict-api-zyaa.onrender.com/docs) · the API sleeps when idle, so the first request can take a minute.
 
 Verified on the hosted API, each run a real PayPal sandbox authorization:
 

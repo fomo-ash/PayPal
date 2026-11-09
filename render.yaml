@@ -33,8 +33,8 @@ services:
       # (sandbox only, rate-limited per IP).
       - { key: DEMO_LOGIN, value: "true" }
       # The web app's origin. If Render gives verdict-web a different URL, change it here.
-      - { key: CORS_ORIGINS, value: "https://verdict-web.onrender.com,http://localhost:5180" }
-      - { key: PAYPAL_LOGIN_REDIRECT_URI, value: "https://verdict-web.onrender.com/auth/callback" }
+      - { key: CORS_ORIGINS, value: "https://verdict-web-z4k7.onrender.com,http://localhost:5180" }
+      - { key: PAYPAL_LOGIN_REDIRECT_URI, value: "https://verdict-web-z4k7.onrender.com/auth/callback" }
       # true once that URL is the Return URL of "Log in with PayPal" in the PayPal app settings
       - { key: PAYPAL_LOGIN_ENABLED, value: "false" }
       - { key: SESSION_SECRET, generateValue: true }
