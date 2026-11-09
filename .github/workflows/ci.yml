@@ -24,3 +24,14 @@ jobs:
       - name: Guard against committed secrets
         run: |
           if git ls-files | grep -E '(^|/)\.env$'; then echo ".env is committed!"; exit 1; fi
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Type-check and build the web app
+        working-directory: apps/web
+        run: npm ci && npm run build
