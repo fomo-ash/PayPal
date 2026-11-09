@@ -2,20 +2,22 @@ import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
 import "./styles.css";
 
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
-import { Layout } from "./components";
+import { Layout, Spinner } from "./components";
 import { AuthProvider } from "./lib/auth";
-import AuthCallback from "./pages/AuthCallback";
-import Home from "./pages/Home";
-import JobPage from "./pages/JobPage";
-import Login from "./pages/Login";
-import Me from "./pages/Me";
-import NewJob from "./pages/NewJob";
-import Review from "./pages/Review";
-import Verdict from "./pages/Verdict";
-import Verify from "./pages/Verify";
+
+// Each page is its own chunk: the sample suite and AG Grid load only where they are used.
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const Home = lazy(() => import("./pages/Home"));
+const JobPage = lazy(() => import("./pages/JobPage"));
+const Login = lazy(() => import("./pages/Login"));
+const Me = lazy(() => import("./pages/Me"));
+const NewJob = lazy(() => import("./pages/NewJob"));
+const Review = lazy(() => import("./pages/Review"));
+const Verdict = lazy(() => import("./pages/Verdict"));
+const Verify = lazy(() => import("./pages/Verify"));
 
 function NotFound() {
   return (
@@ -31,6 +33,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <AuthProvider>
         <Layout>
+          <Suspense fallback={<Spinner label="Loading" />}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
@@ -43,6 +46,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/verify" element={<Verify />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </Layout>
       </AuthProvider>
     </BrowserRouter>
