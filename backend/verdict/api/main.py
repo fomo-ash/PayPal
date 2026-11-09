@@ -42,6 +42,12 @@ def create_app(services: Services | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True}
 
+    @app.get("/", include_in_schema=False)
+    def root() -> dict:
+        """This is the API; people looking for the app land here by mistake."""
+        return {"service": "Verdict API", "health": "/health", "docs": "/docs",
+                "web_app": app.state.services.settings.cors_origin_list[:1]}
+
     @app.get("/public-config")
     def public_config() -> dict:
         """What a browser may know: the PayPal client id is public by design (never the secret)."""
