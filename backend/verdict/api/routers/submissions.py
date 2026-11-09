@@ -146,6 +146,10 @@ def _visible_submission(s: Session, sub_id: uuid.UUID, user: User) -> tuple[Subm
 @router.get("/submissions/{sub_id}")
 def get_submission(sub_id: uuid.UUID, user: CurrentUser, s: DB) -> dict:
     sub, job = _visible_submission(s, sub_id, user)
+    return submission_view(s, sub, job)
+
+
+def submission_view(s: Session, sub: Submission, job: Job) -> dict:
     v = s.get(Verdict, sub.id)
     runs = s.scalars(select(Run).where(Run.submission_id == sub.id)).all()
     scans = s.scalars(select(ScanFinding).where(ScanFinding.submission_id == sub.id)).all()

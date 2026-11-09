@@ -222,7 +222,7 @@ def test_ai_block_waits_for_a_person_who_can_only_lower(Session, make_job, pp):
             is S.HUMAN_REVIEW
     assert money.process_outbox(Session, pp, now=T0) == []           # no money moves
     with Session.begin() as s:
-        money.resolve_review(s, job_id, policy_review(p, "50.00"), reviewer="admin@verdict")
+        money.resolve_review(s, job_id, policy_review(p.capture, "50.00"), reviewer="admin@verdict")
     run_until_idle(Session, pp)
     assert json.loads(cap.calls.last.request.content)["amount"]["value"] == "50.00"
     assert json.loads(pay.calls.last.request.content)["items"][0]["amount"]["value"] == "47.50"

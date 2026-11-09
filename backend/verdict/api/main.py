@@ -10,8 +10,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from verdict.api.deps import CurrentUser, Services
-from verdict.api.routers import dev, jobs, submissions, webhooks
+from verdict.api.routers import admin, dev, jobs, submissions, webhooks
 from verdict.config import Settings, get_settings
+from verdict.core.policy import ReviewError
 from verdict.core.state_machine import IllegalTransition
 from verdict.db.repo import StaleState
 from verdict.grading.suite import SuiteError
@@ -40,6 +41,7 @@ def create_app(services: Services | None = None) -> FastAPI:
     def _money(_: Request, exc: Exception) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, 409)
 
+    @app.exception_handler(ReviewError)
     @app.exception_handler(SuiteError)
     def _bad_suite(_: Request, exc: Exception) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, 422)
@@ -47,6 +49,7 @@ def create_app(services: Services | None = None) -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(submissions.router)
     app.include_router(webhooks.router)
+    app.include_router(admin.router)
     if app.state.services.settings.dev_auth:
         app.include_router(dev.router)
     return app
@@ -63,15 +66,20 @@ def default_services(cfg: Settings) -> Services:
         from verdict.worker.tasks import grade_submission
         grade_submission.delay(str(submission_id))
 
+    def kick_money(job_id):
+        from verdict.worker.tasks import process_outbox
+        process_outbox.delay()
+
     paypal = (PayPalClient(cfg.paypal_base_url, cfg.paypal_client_id, cfg.paypal_secret)
               if cfg.paypal_client_id and cfg.paypal_secret else None)
     svc = Services(settings=cfg, Session=make_session_factory(cfg.database_url),
                    store=LocalBlobStore(cfg.blob_dir), paypal=paypal,
                    runner=make_runner(cfg), enqueue_grading=enqueue_grading,
-                   llm=optional_client(cfg))
+                   llm=optional_client(cfg), kick_money=kick_money)
     if cfg.inline_worker:
-        from verdict.worker.inline import start
+        from verdict.worker.inline import start, start_money
         svc.enqueue_grading = lambda submission_id: start(svc, submission_id)
+        svc.kick_money = lambda job_id: start_money(svc, job_id)
     return svc
 
 

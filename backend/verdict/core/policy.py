@@ -76,8 +76,9 @@ class ReviewError(ValueError):
     pass
 
 
-def resolve_review(payout: Payout, reviewer_capture: Decimal | str) -> PolicyResult:
-    """A human reviewer's final call. They may lower the amount or void, never raise it."""
+def resolve_review(max_capture: Decimal, reviewer_capture: Decimal | str) -> PolicyResult:
+    """A human reviewer's final call. They may lower the amount or void, never raise it above
+    max_capture (the deterministic capture stored on the verdict)."""
     if isinstance(reviewer_capture, float):
         raise ReviewError("capture must be Decimal or str, not float")
     try:
@@ -88,8 +89,8 @@ def resolve_review(payout: Payout, reviewer_capture: Decimal | str) -> PolicyRes
         raise ReviewError("capture must be a finite amount with at most 2 decimals")
     if amount < ZERO:
         raise ReviewError("capture cannot be negative")
-    if amount > payout.capture:
-        raise ReviewError(f"reviewer cannot raise payment above {payout.capture}")
+    if amount > max_capture:
+        raise ReviewError(f"reviewer cannot raise payment above {max_capture}")
     if amount == ZERO:
         return PolicyResult(Settlement.VOID, ZERO, "voided by human reviewer")
     return PolicyResult(Settlement.CAPTURE, amount, "approved by human reviewer")

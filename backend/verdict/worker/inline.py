@@ -25,28 +25,46 @@ def start(svc: Any, submission_id: uuid.UUID) -> None:
                      name=f"inline-{submission_id}").start()
 
 
+def start_money(svc: Any, job_id: uuid.UUID) -> None:
+    """After a human review: drive the capture/void and payout for this job."""
+    threading.Thread(target=_guarded, args=(drive_money, svc, job_id), daemon=True,
+                     name=f"inline-money-{job_id}").start()
+
+
 def run(svc: Any, submission_id: uuid.UUID) -> None:
-    try:
-        out = grading.grade_submission(svc.Session, svc.store, svc.runner, submission_id,
-                                       timeout_s=svc.settings.sandbox_test_timeout_ms / 1000,
-                                       llm=svc.llm)
-        log.warning("graded %s → %s", submission_id, out)
-        deadline = time.monotonic() + MAX_WAIT_S
-        while time.monotonic() < deadline:
-            for o in money.process_outbox(svc.Session, svc.paypal):
-                log.warning("outbox %s → %s %s", o.action, o.result, o.detail)
-            state = _state(svc, submission_id)
-            if state not in WAIT_STATES:
-                log.warning("job settled: %s", state)
-                return
-            time.sleep(POLL_S)
-        log.warning("still %s after %ss; run the Celery worker to finish", state, MAX_WAIT_S)
-    except Exception:
-        log.exception("inline worker failed for %s", submission_id)
+    _guarded(_grade_then_pay, svc, submission_id)
 
 
-def _state(svc: Any, submission_id: uuid.UUID) -> str | None:
+def _grade_then_pay(svc: Any, submission_id: uuid.UUID) -> None:
+    out = grading.grade_submission(svc.Session, svc.store, svc.runner, submission_id,
+                                   timeout_s=svc.settings.sandbox_test_timeout_ms / 1000,
+                                   llm=svc.llm)
+    log.warning("graded %s → %s", submission_id, out)
     with svc.Session() as s:
         sub = s.get(Submission, submission_id)
-        job = s.get(Job, sub.job_id) if sub else None
-        return job.state if job else None
+        job_id = sub.job_id if sub else None
+    if job_id is not None:
+        drive_money(svc, job_id)
+
+
+def drive_money(svc: Any, job_id: uuid.UUID) -> None:
+    deadline = time.monotonic() + MAX_WAIT_S
+    state = None
+    while time.monotonic() < deadline:
+        for o in money.process_outbox(svc.Session, svc.paypal):
+            log.warning("outbox %s → %s %s", o.action, o.result, o.detail)
+        with svc.Session() as s:
+            job = s.get(Job, job_id)
+            state = job.state if job else None
+        if state not in WAIT_STATES:
+            log.warning("job %s settled: %s", job_id, state)
+            return
+        time.sleep(POLL_S)
+    log.warning("still %s after %ss; run the Celery worker to finish", state, MAX_WAIT_S)
+
+
+def _guarded(fn: Any, svc: Any, arg: uuid.UUID) -> None:
+    try:
+        fn(svc, arg)
+    except Exception:
+        log.exception("inline worker failed for %s", arg)

@@ -42,12 +42,12 @@ def test_ai_has_no_way_to_supply_an_amount():
 
 def test_reviewer_cannot_raise_payment():
     with pytest.raises(ReviewError):
-        resolve_review(payout(), "80.01")
+        resolve_review(payout().capture, "80.01")
 
 
 def test_reviewer_can_lower_or_void():
-    assert resolve_review(payout(), "50.00").capture == D("50.00")
-    assert resolve_review(payout(), "0").settlement is Settlement.VOID
+    assert resolve_review(payout().capture, "50.00").capture == D("50.00")
+    assert resolve_review(payout().capture, "0").settlement is Settlement.VOID
 
 
 @pytest.mark.parametrize("raw", ["BLOCK_RECOMMENDED", "HUMAN_REVIEW", "BLOCK", "", None, "clear"])
@@ -67,4 +67,4 @@ def test_hard_signal_as_plain_string_voids():
 @pytest.mark.parametrize("bad", ["50.005", "NaN", "Infinity", "abc", 50.0])
 def test_reviewer_amount_must_be_exact_cents(bad):
     with pytest.raises(ReviewError):
-        resolve_review(payout(), bad)
+        resolve_review(payout().capture, bad)
