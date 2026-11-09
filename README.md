@@ -7,6 +7,21 @@ Verdict is a **pay-on-verification** service for software work. A buyer posts a 
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) (submissions close **Nov 12, 2026, 12:00 PST**).
 
+**Live (PayPal sandbox, on Render):** [verdict-site.onrender.com](https://verdict-site.onrender.com) (how it works) · [API docs](https://verdict-api-zyaa.onrender.com/docs) · the API sleeps when idle, so the first request can take a minute.
+
+Verified on the hosted API, each run a real PayPal sandbox authorization:
+
+| Submission | Fresh inputs | Settlement | PayPal |
+|---|---|---|---|
+| Honest, complete | 200/200 | CAPTURE 100% | $100.00 captured, $95.00 paid out |
+| Honest, skips a validation rule | 188/200 | CAPTURE 75.1% | $75.15 captured, **$24.85 released to the buyer**, $71.39 paid out |
+| Memorized the hidden tests (18/20 hidden) | 31/200 | VOID | $0 captured, $100.00 released |
+
+A time-bomb submission that passes every test is caught only by the AI review, which cites the
+line and sends it to a person (`make bench-ai`, and `demo_flow.py cheat_timebomb`).
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/fomo-ash/PayPal) one free web service, free Postgres and the landing page, from [`render.yaml`](render.yaml) ([guide](docs/DEPLOY.md)).
+
 ---
 
 ## Table of contents
