@@ -22,9 +22,10 @@ def test_all_fair():
     assert len(out.items) == 5 and out.unfair == [] and out.error is None
 
 
-def test_unfair_tests_are_reported():
-    out = check_spec(FakeLLM(spec_reply(unfair={"t3"})), "spec", [], TESTS)
-    assert [i.test_id for i in out.unfair] == ["t3"]
+def test_unfair_tests_are_reported_when_confirmed():
+    llm = FakeLLM(spec_reply(unfair={"t3"}))
+    out = check_spec(llm, "spec", [], TESTS)
+    assert [i.test_id for i in out.unfair] == ["t3"] and len(llm.prompts) == 2
 
 
 def test_skipped_test_is_not_held_against_the_buyer():
@@ -33,6 +34,32 @@ def test_skipped_test_is_not_held_against_the_buyer():
     out = check_spec(llm, "spec", [], TESTS)
     assert len(out.items) == 5 and out.unfair == []
     assert out.items[4].reason == "not assessed by the checker"
+
+
+def test_one_noisy_flag_is_not_enough():
+    calls = []
+
+    def flaky(prompt, schema):
+        calls.append(prompt)
+        unfair = {"t3"} if len(calls) == 1 else set()      # flags t3, then changes its mind
+        return spec_reply(unfair)(prompt, schema)
+
+    out = check_spec(FakeLLM(flaky), "spec", [], TESTS)
+    assert out.unfair == [] and len(calls) == 2
+    assert "not confirmed" in next(i for i in out.items if i.test_id == "t3").reason
+    assert '"id": "t0"' not in calls[1]                       # second call only re-asks t3
+
+
+def test_second_check_down_does_not_block():
+    calls = []
+
+    def first_then_down(prompt, schema):
+        calls.append(prompt)
+        if len(calls) > 1:
+            raise LLMUnavailable("429")
+        return spec_reply({"t1"})(prompt, schema)
+
+    assert check_spec(FakeLLM(first_then_down), "spec", [], TESTS).unfair == []
 
 
 def test_llm_down_reports_error():

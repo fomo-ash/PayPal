@@ -5,6 +5,8 @@ and the public examples alone?" Any test marked not implied sends the job to INV
 the model's reason, so the buyer must fix the spec or drop the test before funding.
 
 Long inputs are clipped (the free tier allows ~8K tokens/min); tests are sent in batches.
+A test is blocked only if a second, separate call confirms it is unfair, so one noisy answer
+from the model cannot stop a fair suite from being funded.
 If the LLM is unavailable the check is reported as skipped. Funding is not blocked in that
 case: the reference-solution validation still applies, and the job page shows it unchecked.
 """
@@ -64,6 +66,24 @@ def build_prompt(spec: str, examples: list[dict[str, Any]], tests: list[dict[str
 
 def check_spec(llm: LLMClient, spec: str, examples: list[dict[str, Any]],
                tests: list[dict[str, Any]]) -> SpecCheckOutcome:
+    first = _one_pass(llm, spec, examples, tests)
+    flagged = {i.test_id for i in first.unfair}
+    if first.error or not flagged:
+        return first
+    second = _one_pass(llm, spec, examples, [t for t in tests if t["id"] in flagged])
+    if second.error:                      # cannot confirm: do not block on one answer
+        second_unfair: set[str] = set()
+    else:
+        second_unfair = {i.test_id for i in second.unfair}
+    items = [i if i.implied_by_spec or i.test_id in second_unfair else SpecCheckItem(
+                 test_id=i.test_id, implied_by_spec=True,
+                 reason=f"flagged once, not confirmed on a second check ({i.reason})"[:500])
+             for i in first.items]
+    return SpecCheckOutcome(items=items, model=first.model)
+
+
+def _one_pass(llm: LLMClient, spec: str, examples: list[dict[str, Any]],
+              tests: list[dict[str, Any]]) -> SpecCheckOutcome:
     out = SpecCheckOutcome()
     for batch in _batches(tests):
         try:

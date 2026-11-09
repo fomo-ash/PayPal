@@ -52,6 +52,11 @@ def untrusted(text: str) -> str:
     return text.replace("</", "<\\/")
 
 
+def _json_mode_rejected(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "json_validate_failed" in msg or "failed to validate json" in msg
+
+
 def _extract_json(text: str) -> str:
     """Accept bare JSON or JSON wrapped in ``` fences / surrounding prose."""
     text = text.strip()
@@ -81,15 +86,22 @@ class LLMClient:
         for p in self.providers:
             client = self._clients[p.name]
             messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+            strict = True                     # provider-side JSON mode
             for attempt in range(2):          # 1 normal try + 1 repair try
                 try:
+                    kw = {"response_format": {"type": "json_object"}} if strict else {}
                     resp = client.chat.completions.create(
                         model=p.model, messages=messages, temperature=temperature,
-                        max_tokens=max_tokens, response_format={"type": "json_object"},
+                        max_tokens=max_tokens, **kw,
                     )
                     raw = resp.choices[0].message.content or ""
                 except Exception as exc:  # noqa: BLE001 - network, 429 after retries, 5xx
                     errors.append(f"{p.name}: {type(exc).__name__}: {exc}")
+                    if strict and attempt == 0 and _json_mode_rejected(exc):
+                        # Groq returns 400 when its own JSON-mode output fails validation.
+                        # Ask again without JSON mode; _extract_json + Pydantic still check it.
+                        strict = False
+                        continue
                     log.warning("LLM provider %s failed: %s", p.name, exc)
                     break                     # move on to the next provider
                 try:

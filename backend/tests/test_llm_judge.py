@@ -17,10 +17,12 @@ class FakeClient:
     def __init__(self, replies):
         self.replies = list(replies)
         self.calls = 0
+        self.kwargs = []
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
     def _create(self, **kwargs):
         self.calls += 1
+        self.kwargs.append(kwargs)
         r = self.replies.pop(0)
         if isinstance(r, Exception):
             raise r
@@ -54,6 +56,15 @@ def test_falls_back_when_primary_errors():
     llm, fakes = make([RuntimeError("429 rate limited")], [GOOD])
     res = llm.chat_json("s", "u", Review)
     assert res.provider == "fallback" and fakes["fallback"].calls == 1
+
+
+def test_groq_json_mode_rejection_retries_without_json_mode():
+    err = RuntimeError("Error code: 400 - {'error': {'code': 'json_validate_failed'}}")
+    llm, fakes = make([err, GOOD])
+    res = llm.chat_json("s", "u", Review)
+    assert res.provider == "groq" and fakes["groq"].calls == 2
+    assert "response_format" in fakes["groq"].kwargs[0]
+    assert "response_format" not in fakes["groq"].kwargs[1]
 
 
 def test_all_providers_failing_raises():
