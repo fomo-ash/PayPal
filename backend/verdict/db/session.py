@@ -12,7 +12,16 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 
+def normalize_url(url: str) -> str:
+    """Hosts (Render, Heroku) hand out postgres:// or postgresql:// URLs; we use psycopg 3."""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
 def make_engine(url: str, **kw) -> Engine:
+    url = normalize_url(url)
     if url.startswith("sqlite") and "connect_args" not in kw:
         # local demo mode: API threads + the inline worker thread share one SQLite file
         kw["connect_args"] = {"check_same_thread": False, "timeout": 30}

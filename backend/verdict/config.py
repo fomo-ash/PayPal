@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = "gemini-flash-latest"
 
-    cors_origins: str = "http://localhost:3000"   # comma-separated web origins allowed to call the API
+    cors_origins: str = "http://localhost:3000"   # web origins allowed to call the API (comma list)
     session_secret: str = ""                  # signs login sessions; scripts/gen_secrets.py
     inline_worker: bool = False               # `make local`: grade + pay in-process, no Redis
     dev_auth: bool = True                     # X-User-Id header login; never with live
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://verdict:verdict@localhost:5432/verdict"
     redis_url: str = "redis://localhost:6379/0"
 
+    blob_backend: str = "local"                # local (disk) | db (Postgres, no shared disk)
     blob_dir: str = "data/blobs"               # LocalBlobStore root (git-ignored)
     r2_account_id: str = ""
     r2_access_key_id: str = ""

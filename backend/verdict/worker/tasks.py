@@ -19,7 +19,7 @@ from verdict.judge.llm import LLMClient, optional_client
 from verdict.paypal.client import PayPalClient
 from verdict.sandbox.e2b_runner import SandboxUnavailable
 from verdict.sandbox.runner import Runner
-from verdict.storage import BlobStore, LocalBlobStore
+from verdict.storage import BlobStore, make_store
 from verdict.worker import grading, money, timers
 from verdict.worker.celery_app import app
 from verdict.worker.runners import make_runner
@@ -53,7 +53,7 @@ def expire_holds() -> int:
 
 @lru_cache
 def store() -> BlobStore:
-    return LocalBlobStore(get_settings().blob_dir)
+    return make_store(get_settings(), session_factory())
 
 
 @lru_cache

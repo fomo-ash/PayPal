@@ -76,7 +76,7 @@ def default_services(cfg: Settings) -> Services:
     from verdict.db.session import make_session_factory
     from verdict.judge.llm import optional_client
     from verdict.paypal.client import PayPalClient
-    from verdict.storage import LocalBlobStore
+    from verdict.storage import make_store
     from verdict.worker.runners import make_runner
 
     def enqueue_grading(submission_id):  # imported lazily: the API must start without Redis
@@ -89,8 +89,8 @@ def default_services(cfg: Settings) -> Services:
 
     paypal = (PayPalClient(cfg.paypal_base_url, cfg.paypal_client_id, cfg.paypal_secret)
               if cfg.paypal_client_id and cfg.paypal_secret else None)
-    svc = Services(settings=cfg, Session=make_session_factory(cfg.database_url),
-                   store=LocalBlobStore(cfg.blob_dir), paypal=paypal,
+    Session = make_session_factory(cfg.database_url)  # noqa: N806
+    svc = Services(settings=cfg, Session=Session, store=make_store(cfg, Session), paypal=paypal,
                    runner=make_runner(cfg), enqueue_grading=enqueue_grading,
                    llm=optional_client(cfg), kick_money=kick_money)
     if cfg.inline_worker:

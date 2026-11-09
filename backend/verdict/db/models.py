@@ -24,6 +24,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     Numeric,
     String,
@@ -305,6 +306,15 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = _created()
     # (job_id, seq) unique: two writers can never both append entry N to the same chain.
     __table_args__ = (UniqueConstraint("job_id", "seq", name="job_seq"),)
+
+
+class Blob(Base):
+    """Blob store in Postgres (BLOB_BACKEND=db), for deploys where the API and the worker do not
+    share a disk. Suites and submissions are small (hard limit 1 MB per submission)."""
+    __tablename__ = "blobs"
+    key: Mapped[str] = mapped_column(String(300), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = _created()
 
 
 class Receipt(Base):
