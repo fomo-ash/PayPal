@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
-import { STATE_LABEL, tone, usd } from "./lib/format";
+import { STATE_LABEL, tone } from "./lib/format";
 import type { Finding } from "./lib/types";
 
 export function Mark() {
@@ -69,30 +69,6 @@ export function Spinner({ label }: { label: string }) {
       <span className="spin__dot" aria-hidden="true" />
       {label}
     </p>
-  );
-}
-
-// The hold, split into what PayPal captured (worker + fee) and what went back to the buyer.
-export function HoldBar({ amount, worker, fee, released, settled }: {
-  amount: string; worker: string; fee: string; released: string; settled: boolean;
-}) {
-  const total = Number(amount) || 1;
-  const w = (Number(worker) / total) * 100;
-  const f = (Number(fee) / total) * 100;
-  const r = (Number(released) / total) * 100;
-  return (
-    <figure className="hold" aria-label={`Hold ${usd(amount)}: worker ${usd(worker)}, fee ${usd(fee)}, back to buyer ${usd(released)}`}>
-      <div className={`hold__bar ${settled ? "is-settled" : ""}`}>
-        {w > 0 && <div className="hold__seg hold__seg--worker" style={{ width: `${w}%` }} />}
-        {f > 0 && <div className="hold__seg hold__seg--fee" style={{ width: `${f}%` }} />}
-        {r > 0 && <div className="hold__seg hold__seg--back" style={{ width: `${r}%` }} />}
-      </div>
-      <figcaption className="hold__legend">
-        <span><i className="sw sw--worker" />Worker <b className="num">{usd(worker)}</b></span>
-        <span><i className="sw sw--fee" />Fee <b className="num">{usd(fee)}</b></span>
-        <span><i className="sw sw--back" />Back to buyer <b className="num">{usd(released)}</b></span>
-      </figcaption>
-    </figure>
   );
 }
 

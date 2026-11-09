@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CodeView, ErrorNote, HoldBar, Spinner, StatePill } from "../components";
+import { CodeView, ErrorNote, Spinner, StatePill } from "../components";
+import { Tear, useCount, useOnceAfter } from "../tear";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { MOVING, pct, SETTLED, usd } from "../lib/format";
@@ -90,7 +91,7 @@ export default function Verdict() {
             </div>
             <p className="score__why">{reasonText(v.reason)}{v.decided_by && v.decided_by !== "policy" ? ` · decided by ${v.decided_by}` : ""}</p>
           </div>
-          <HoldBar amount={String(Number(v.capture) + Number(v.released))} worker={v.worker_amount} fee={v.fee} released={v.released} settled={settled} />
+          <VerdictTear v={v} state={view.job_state} settled={settled} />
         </section>
       ) : (
         <Spinner label={view.job_state === "SUBMITTED" ? "Queued for the sandbox" : "Running hidden tests and 200 fresh inputs in the sandbox"} />
@@ -108,8 +109,8 @@ export default function Verdict() {
                 return (
                   <tr key={g}>
                     <td>{g}</td>
-                    <td className="num"><Ratio r={h} /></td>
-                    <td className="num"><Ratio r={f} /></td>
+                    <td className="num"><Ratio r={h} start={!!v} /></td>
+                    <td className="num"><Ratio r={f} start={!!v} /></td>
                   </tr>
                 );
               })}
@@ -155,10 +156,36 @@ export default function Verdict() {
   );
 }
 
-function Ratio({ r }: { r?: { passed: number; total: number } }) {
+function Ratio({ r, start }: { r?: { passed: number; total: number }; start: boolean }) {
+  const n = useCount(r?.passed ?? 0, start);
   if (!r) return <>—</>;
   const ok = r.passed === r.total;
-  return <span className={ok ? "ok-ink" : r.passed / r.total < 0.5 ? "bad-ink" : ""}>{r.passed}/{r.total}</span>;
+  return (
+    <span className={`ratio ${ok ? "ok-ink" : r.passed / r.total < 0.5 ? "bad-ink" : ""}`}>
+      {n}/{r.total}
+      <i className="ratio__bar" aria-hidden="true"><i style={{ transform: `scaleX(${r.total ? n / r.total : 0})` }} /></i>
+    </span>
+  );
+}
+
+// The peak: the live hold, whole for a beat, then torn at the cents the API decided.
+function VerdictTear({ v, state, settled }: { v: NonNullable<SubmissionView["verdict"]>; state: string; settled: boolean }) {
+  const amount = Number(v.capture) + Number(v.released);
+  const review = state === "HUMAN_REVIEW";
+  const isVoid = v.settlement === "VOID" || state === "VOIDING" || state === "VOIDED";
+  const torn = useOnceAfter(!review);
+  const label = review ? "held while a person decides" : settled ? "settled with PayPal" : isVoid ? "voiding" : "capturing";
+  return (
+    <div className="verdict-tear">
+      <Tear
+        split={{ amount, worker: Number(v.worker_amount), fee: Number(v.fee), back: Number(v.released) }}
+        torn={torn && !review}
+        isVoid={isVoid && torn}
+        label={`Hold ${usd(amount)}`}
+        state={label}
+      />
+    </div>
+  );
 }
 
 function headline(v: SubmissionView): string {
@@ -234,7 +261,7 @@ function ReceiptCard({ jobId }: { jobId: string }) {
   if (!doc) return null;
   const p = doc.receipt.paypal;
   return (
-    <section className="block receipt">
+    <section className="block receipt slide-in">
       <h2>Signed receipt</h2>
       <dl className="facts facts--ids">
         <div><dt>PayPal order</dt><dd className="mono">{p.order_id ?? "—"}</dd></div>
