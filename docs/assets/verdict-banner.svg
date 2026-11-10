@@ -3,79 +3,55 @@
   <desc id="d">Pay only for the code that passes. PayPal holds the money, Verdict checks the code, PayPal pays only for what passed.</desc>
   <defs>
     <clipPath id="frame"><rect width="1280" height="440" rx="28"/></clipPath>
-    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#001435"/>
-      <stop offset="0.55" stop-color="#002A7A"/>
-      <stop offset="1" stop-color="#001C64"/>
-    </linearGradient>
-    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="70"/></filter>
-    <filter id="soft" x="-20%" y="-50%" width="140%" height="220%"><feGaussianBlur stdDeviation="18"/></filter>
-    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
-      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0"/></filter>
-    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.05"/>
-    </linearGradient>
-    <linearGradient id="worker" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#22C55E"/><stop offset="1" stop-color="#16A34A"/>
-    </linearGradient>
+    <pattern id="rule" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#1C1A16" stroke-opacity="0.045"/>
+    </pattern>
   </defs>
 
   <g clip-path="url(#frame)">
-    <rect width="1280" height="440" fill="url(#base)"/>
-    <!-- soft light: PayPal cyan, blue and yellow, plus the green of money that moves -->
-    <g filter="url(#blur)">
-      <circle cx="180" cy="80" r="190" fill="#009CDE" opacity="0.85"/>
-      <circle cx="560" cy="430" r="210" fill="#0070E0" opacity="0.8"/>
-      <circle cx="1180" cy="20" r="170" fill="#FFC439" opacity="0.42"/>
-      <circle cx="1240" cy="300" r="150" fill="#009CDE" opacity="0.45"/>
-      <circle cx="980" cy="430" r="150" fill="#16A34A" opacity="0.35"/>
-      <circle cx="820" cy="190" r="120" fill="#60CDFF" opacity="0.35"/>
-    </g>
-    <rect width="1280" height="440" filter="url(#grain)"/>
+    <rect width="1280" height="440" fill="#F6F3EA"/>
+    <rect x="780" width="500" height="440" fill="url(#rule)"/>
+    <rect x="0.5" y="0.5" width="1279" height="439" rx="27.5" fill="none" stroke="#1C1A16" stroke-opacity="0.1"/>
 
     <!-- copy -->
-    <g font-family="'Geist','Inter','SF Pro Display',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" fill="#FFFFFF">
-      <g transform="translate(84 92)">
-        <rect width="44" height="44" rx="11" fill="#FFFFFF"/>
-        <path d="M13 23l7 7 12-14" stroke="#001C64" stroke-width="4.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="60" y="33" font-size="30" font-weight="600" letter-spacing="-0.5">Verdict</text>
+    <g font-family="'Geist','Inter','SF Pro Display',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" fill="#141311">
+      <g transform="translate(84 84)">
+        <rect width="40" height="40" rx="10" fill="#001C64"/>
+        <path d="M12 21l6 6 11-13" stroke="#F6F3EA" stroke-width="3.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="54" y="29" font-size="26" font-weight="600" letter-spacing="-0.4">Verdict</text>
       </g>
-      <text x="84" y="226" font-size="62" font-weight="700" letter-spacing="-2.4">Pay only for the code</text>
-      <text x="84" y="296" font-size="62" font-weight="700" letter-spacing="-2.4">that passes.</text>
-      <text x="86" y="350" font-size="20" font-weight="400" fill="#CFE3FF" letter-spacing="0.1">PayPal holds the money. Verdict tests the code. PayPal pays only for what passed.</text>
-      <g transform="translate(86 378)" font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#9FC2FF" letter-spacing="1.2">
-        <text>AUTHORIZE  ·  TEST  ·  JUDGE  ·  CAPTURE / VOID  ·  PAYOUT  ·  SIGNED RECEIPT</text>
-      </g>
+      <text x="84" y="214" font-size="60" font-weight="700" letter-spacing="-2.4">Pay only for the code</text>
+      <text x="84" y="282" font-size="60" font-weight="700" letter-spacing="-2.4" fill="#001C64">that passes.</text>
+      <text x="86" y="334" font-size="19" font-weight="400" fill="#5B574E">PayPal holds the money. Verdict tests the code. PayPal pays only for what passed.</text>
+      <text x="86" y="372" font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#8A857A" letter-spacing="1.4">AUTHORIZE · TEST · JUDGE · CAPTURE / VOID · PAYOUT · SIGNED RECEIPT</text>
     </g>
 
     <!-- the hold card: $100 torn at the cents -->
     <g transform="translate(838 104)">
-      <rect x="0" y="0" width="372" height="232" rx="20" fill="url(#glass)" stroke="#FFFFFF" stroke-opacity="0.22"/>
-      <g font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace" fill="#FFFFFF">
-        <text x="24" y="38" font-size="11" letter-spacing="1.6" fill="#BFD6FF">PAYPAL AUTHORIZATION</text>
+      <rect x="0" y="4" width="372" height="232" rx="18" fill="#1C1A16" fill-opacity="0.06"/>
+      <rect x="0" y="0" width="372" height="232" rx="18" fill="#FFFFFF" stroke="#1C1A16" stroke-opacity="0.12"/>
+      <g font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace" fill="#141311">
+        <text x="24" y="38" font-size="11" letter-spacing="1.6" fill="#8A857A">PAYPAL AUTHORIZATION</text>
         <text x="24" y="78" font-size="34" font-weight="600" letter-spacing="-1">$100.00</text>
-        <rect x="276" y="22" width="72" height="24" rx="6" fill="#16A34A" fill-opacity="0.25" stroke="#4ADE80" stroke-opacity="0.5"/>
-        <text x="291" y="38" font-size="11" letter-spacing="1.2" fill="#BBF7D0">SETTLED</text>
+        <rect x="270" y="22" width="78" height="24" rx="12" fill="#E7F6EC"/>
+        <text x="309" y="38" text-anchor="middle" font-size="11" letter-spacing="1.2" fill="#15803D">SETTLED</text>
       </g>
-      <!-- shadow under the pieces -->
-      <rect x="28" y="150" width="320" height="22" rx="11" fill="#000814" opacity="0.45" filter="url(#soft)"/>
       <!-- worker 71.39% -->
       <g transform="translate(24 112) rotate(-1.4 0 22)">
-        <rect width="222" height="46" rx="11" fill="url(#worker)"/>
+        <rect width="222" height="46" rx="10" fill="#16A34A"/>
         <text x="14" y="29" font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,monospace" font-size="16" font-weight="600" fill="#FFFFFF">$71.39</text>
       </g>
       <!-- fee 3.76% -->
-      <rect x="252" y="96" width="12" height="46" rx="3" fill="#DAD7CF" transform="rotate(2 258 119)"/>
+      <rect x="252" y="96" width="12" height="46" rx="3" fill="#C9C3B5" transform="rotate(2 258 119)"/>
       <!-- back to the buyer 24.85% -->
       <g transform="translate(270 118) rotate(1.8 0 22)">
-        <rect width="78" height="46" rx="11" fill="#FFFFFF" fill-opacity="0.92"/>
+        <rect width="78" height="46" rx="10" fill="#F6F3EA" stroke="#001C64" stroke-opacity="0.35"/>
         <text x="66" y="29" text-anchor="end" font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,monospace" font-size="14" font-weight="600" fill="#001C64">$24.85</text>
       </g>
-      <g font-family="'Geist','Inter',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#CFE3FF">
+      <g font-family="'Geist','Inter',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#5B574E">
         <text x="24" y="196">to the worker</text>
         <text x="348" y="196" text-anchor="end">released, never charged</text>
-        <text x="24" y="214" fill="#8FB3EA" font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,monospace" font-size="11">score 75.1% · fee $3.76</text>
+        <text x="24" y="214" fill="#8A857A" font-family="'Geist Mono','SF Mono',ui-monospace,Menlo,monospace" font-size="11">score 75.1% · fee $3.76</text>
       </g>
     </g>
   </g>
