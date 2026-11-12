@@ -21,6 +21,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   return (
     <>
+      <BackdropVideo />
       <header className="top">
         <Mark />
         <nav className="top__nav" aria-label="Main">
@@ -51,6 +52,30 @@ export function Layout({ children }: { children: ReactNode }) {
         <a href="https://github.com/fomo-ash/PayPal">Source</a>
       </footer>
     </>
+  );
+}
+
+// A slow card tap behind every page, washed in cream so text stays readable.
+// Still poster only when the visitor asks for less motion.
+function BackdropVideo() {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = true;
+    const still = matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => (still.matches ? v.pause() : v.play().catch(() => {}));
+    apply();
+    still.addEventListener("change", apply);
+    return () => still.removeEventListener("change", apply);
+  }, []);
+  return (
+    <div className="backdrop" aria-hidden="true">
+      <video ref={ref} muted loop playsInline preload="auto" poster="/bg/pay.jpg">
+        <source src="/bg/pay.webm" type="video/webm" />
+        <source src="/bg/pay.mp4" type="video/mp4" />
+      </video>
+    </div>
   );
 }
 
